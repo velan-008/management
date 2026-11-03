@@ -103,6 +103,27 @@ Sale.init(
     notes: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+    total_amount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true
+    },
+    discount_amount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true
+    },
+    tax_amount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true
+    },
+    net_amount: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true
+    },
+    payment_mode: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      defaultValue: 'CASH'
     }
   },
   {

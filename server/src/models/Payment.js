@@ -26,7 +26,7 @@ Payment.init(
       }
     },
     payment_method: {
-      type: DataTypes.ENUM('CASH', 'CARD', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'OTHER'),
+      type: DataTypes.ENUM('CASH', 'CARD', 'UPI', 'CREDIT', 'BANK_TRANSFER', 'CHEQUE', 'OTHER'),
       allowNull: false
     },
     reference_number: {

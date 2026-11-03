@@ -42,6 +42,10 @@ StockMovement.init(
       type: DataTypes.STRING(80),
       allowNull: true
     },
+    batch_number: {
+      type: DataTypes.STRING(60),
+      allowNull: true
+    },
     notes: {
       type: DataTypes.STRING(255),
       allowNull: true

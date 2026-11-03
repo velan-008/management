@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Package, Tag, History } from 'lucide-react';
+import { Package, Tag, Layers, Award, Scale, History } from 'lucide-react';
 import { ProductsPage } from './ProductsPage.jsx';
 import { CategoriesPage } from './CategoriesPage.jsx';
+import { SubCategoriesPage } from './SubCategoriesPage.jsx';
+import { BrandsPage } from './BrandsPage.jsx';
+import { UnitsPage } from './UnitsPage.jsx';
 import { StockHistoryPage } from './StockHistoryPage.jsx';
 
 export function InventoryPage() {
@@ -30,7 +33,7 @@ export function InventoryPage() {
   return (
     <div className="space-y-6">
       {/* Tab Navigation Pill Bar */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl w-fit border border-slate-300/60 shadow-inner">
+      <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl w-fit border border-slate-300/60 shadow-inner flex-wrap">
         <button
           type="button"
           onClick={() => setTab('products')}
@@ -41,7 +44,7 @@ export function InventoryPage() {
           }`}
         >
           <Package className="w-4 h-4 text-slate-500" />
-          <span>Products & Stock</span>
+          <span>Products</span>
         </button>
 
         <button
@@ -55,6 +58,46 @@ export function InventoryPage() {
         >
           <Tag className="w-4 h-4 text-slate-500" />
           <span>Categories</span>
+        </button>
+
+        <button
+          type="button"
+          aria-label="Sub-Types"
+          onClick={() => setTab('sub-categories')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            currentTab === 'sub-categories'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Layers className="w-4 h-4 text-slate-500" />
+          <span>Sub-Categories</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTab('brands')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            currentTab === 'brands'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Award className="w-4 h-4 text-slate-500" />
+          <span>Brands</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTab('units')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            currentTab === 'units'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+          }`}
+        >
+          <Scale className="w-4 h-4 text-slate-500" />
+          <span>Units</span>
         </button>
 
         <button
@@ -78,6 +121,18 @@ export function InventoryPage() {
 
       {currentTab === 'categories' && (
         <CategoriesPage onFilterProductsByCategory={handleFilterProductsByCategory} />
+      )}
+
+      {currentTab === 'sub-categories' && (
+        <SubCategoriesPage />
+      )}
+
+      {currentTab === 'brands' && (
+        <BrandsPage />
+      )}
+
+      {currentTab === 'units' && (
+        <UnitsPage />
       )}
 
       {currentTab === 'history' && (

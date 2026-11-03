@@ -159,8 +159,7 @@ export function PurchasesPage() {
   }, 0);
 
   const freight = parseFloat(poForm.freight_charges) || 0;
-  const discount = parseFloat(poForm.discount_total) || 0;
-  const grandTotal = Math.max(0, subtotal + taxTotal + freight - discount);
+  const grandTotal = Math.max(0, subtotal + taxTotal + freight);
 
   const handleCreatePo = async (e) => {
     e.preventDefault();
@@ -603,7 +602,7 @@ export function PurchasesPage() {
 
           {/* Charges & Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-            <div>
+            <div className="sm:col-span-2">
               <label className="block font-semibold text-slate-700 mb-1">Freight / Transport Charges</label>
               <input
                 type="number"
@@ -611,17 +610,6 @@ export function PurchasesPage() {
                 min="0"
                 value={poForm.freight_charges}
                 onChange={(e) => setPoForm((f) => ({ ...f, freight_charges: e.target.value }))}
-                className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Discount Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={poForm.discount_total}
-                onChange={(e) => setPoForm((f) => ({ ...f, discount_total: e.target.value }))}
                 className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs"
               />
             </div>
@@ -665,12 +653,6 @@ export function PurchasesPage() {
               <span>Freight:</span>
               <span>{currency}{freight.toFixed(2)}</span>
             </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-emerald-600">
-                <span>Discount:</span>
-                <span>-{currency}{discount.toFixed(2)}</span>
-              </div>
-            )}
             <div className="flex justify-between text-sm font-bold text-slate-900 pt-1.5 border-t border-slate-200">
               <span>Grand Total:</span>
               <span>{currency}{grandTotal.toFixed(2)}</span>

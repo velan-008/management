@@ -11,7 +11,7 @@ export const up = async (queryInterface, Sequelize) => {
     },
     email: {
       type: Sequelize.STRING(120),
-      allowNull: false
+      allowNull: true
     },
     phone: {
       type: Sequelize.STRING(25),

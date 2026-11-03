@@ -130,10 +130,19 @@ function BusinessSettings({ business, refreshUser, onSave }) {
       alert('Please enter a valid Business Name');
       return;
     }
+    if (form.email && form.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(form.email.trim())) {
+        alert('Please enter a valid Business Email (e.g. contact@example.com) or leave it empty');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const payload = {
         name: form.name.trim(),
+        email: form.email && form.email.trim() ? form.email.trim().toLowerCase() : null,
         phone: form.phone ? form.phone.trim() : null,
         address: form.address ? form.address.trim() : null,
         state: form.state ? form.state.trim() : 'Default',
@@ -143,15 +152,11 @@ function BusinessSettings({ business, refreshUser, onSave }) {
         currency_symbol: form.currency_symbol || '$'
       };
 
-      if (form.email && form.email.trim()) {
-        payload.email = form.email.trim().toLowerCase();
-      }
-
       await api.put('/businesses/me', payload);
       if (refreshUser) await refreshUser();
       onSave('Business settings saved!');
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to save settings';
+      const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to save settings';
       alert(msg);
     } finally {
       setLoading(false);

@@ -21,7 +21,7 @@ import { ConfirmationModal } from '../../components/ui/ConfirmationModal.jsx';
 import { Pagination } from '../../components/ui/Pagination.jsx';
 import { Skeleton } from '../../components/ui/Skeleton.jsx';
 import { EmptyState } from '../../components/ui/EmptyState.jsx';
-import { productService, categoryService } from '../../services/businessServices.js';
+import { productService, categoryService, subCategoryService, brandService, unitService } from '../../services/businessServices.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotification } from '../../context/NotificationContext.jsx';
 import { formatCurrency as formatCur } from '../../utils/formatters.js';
@@ -50,12 +50,17 @@ export function ProductsPage({ onNavigateToHistory }) {
   // State
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [units, setUnits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Filters & Search
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
+  const [filterSubCategory, setFilterSubCategory] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
   const [stockStatus, setStockStatus] = useState('');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, totalPages: 1, limit: 15 });
@@ -71,19 +76,23 @@ export function ProductsPage({ onNavigateToHistory }) {
     name: '',
     sku: '',
     barcode: '',
+    category_id: '',
+    sub_category_id: '',
+    brand_id: '',
     brand: '',
+    unit_id: '',
+    unit: 'pcs',
     description: '',
     cost_price: '0.00',
     selling_price: '',
     wholesale_price: '',
     batch_number: '',
     expiry_date: '',
+    image_url: '',
     carton_pack_qty: '',
     quantity: '0',
     low_stock_threshold: '5',
     tax_rate: '0',
-    unit: 'pcs',
-    category_id: '',
     is_active: true
   });
 
@@ -97,11 +106,19 @@ export function ProductsPage({ onNavigateToHistory }) {
 
   const formatCurrency = (val) => formatCur(val, currency);
 
-  // Fetch Categories
-  const fetchCategories = useCallback(async () => {
+  // Fetch Master Data
+  const fetchMasterData = useCallback(async () => {
     try {
-      const res = await categoryService.list();
-      setCategories(res.data?.categories || []);
+      const [catRes, subRes, brandRes, unitRes] = await Promise.all([
+        categoryService.list(),
+        subCategoryService.list(),
+        brandService.list(),
+        unitService.list()
+      ]);
+      setCategories(catRes.data?.categories || []);
+      setSubCategories(subRes.data?.subCategories || []);
+      setBrands(brandRes.data?.brands || []);
+      setUnits(unitRes.data?.units || []);
     } catch {
       // Non-fatal
     }
@@ -119,6 +136,8 @@ export function ProductsPage({ onNavigateToHistory }) {
       };
       if (search.trim()) params.search = search.trim();
       if (filterCategory) params.category_id = filterCategory;
+      if (filterSubCategory) params.sub_category_id = filterSubCategory;
+      if (filterBrand) params.brand_id = filterBrand;
       if (stockStatus) params.stock_status = stockStatus;
 
       const res = await productService.list(params);
@@ -129,11 +148,11 @@ export function ProductsPage({ onNavigateToHistory }) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterCategory, stockStatus]);
+  }, [page, search, filterCategory, filterSubCategory, filterBrand, stockStatus]);
 
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    fetchMasterData();
+  }, [fetchMasterData]);
 
   useEffect(() => {
     fetchProducts();
@@ -148,25 +167,58 @@ export function ProductsPage({ onNavigateToHistory }) {
     }));
   };
 
+  const handleCategoryChange = (e) => {
+    const catId = e.target.value;
+    setForm((prev) => ({
+      ...prev,
+      category_id: catId,
+      sub_category_id: ''
+    }));
+  };
+
+  const handleBrandChange = (e) => {
+    const bId = e.target.value;
+    const selected = brands.find((b) => String(b.id) === String(bId));
+    setForm((prev) => ({
+      ...prev,
+      brand_id: bId,
+      brand: selected ? selected.name : ''
+    }));
+  };
+
+  const handleUnitChange = (e) => {
+    const uId = e.target.value;
+    const selected = units.find((u) => String(u.id) === String(uId));
+    setForm((prev) => ({
+      ...prev,
+      unit_id: uId,
+      unit: selected ? (selected.short_code || selected.name).toLowerCase() : prev.unit
+    }));
+  };
+
   // Open Create Modal
   const openCreateModal = () => {
     setForm({
       name: '',
       sku: `SKU-${Date.now().toString().slice(-6)}`,
       barcode: '',
+      category_id: '',
+      sub_category_id: '',
+      brand_id: '',
       brand: '',
+      unit_id: '',
+      unit: 'pcs',
       description: '',
       cost_price: '0.00',
       selling_price: '',
       wholesale_price: '',
       batch_number: '',
       expiry_date: '',
+      image_url: '',
       carton_pack_qty: '',
       quantity: '0',
       low_stock_threshold: '5',
       tax_rate: '0',
-      unit: 'pcs',
-      category_id: '',
       is_active: true
     });
     setFormError('');
@@ -181,18 +233,22 @@ export function ProductsPage({ onNavigateToHistory }) {
       name: product.name,
       sku: product.sku,
       barcode: product.barcode || '',
+      category_id: product.category_id ? String(product.category_id) : '',
+      sub_category_id: product.sub_category_id ? String(product.sub_category_id) : '',
+      brand_id: product.brand_id ? String(product.brand_id) : '',
       brand: product.brand || '',
+      unit_id: product.unit_id ? String(product.unit_id) : '',
+      unit: product.unit || 'pcs',
       description: product.description || '',
       cost_price: product.cost_price,
       selling_price: product.selling_price,
       wholesale_price: product.wholesale_price || '',
       batch_number: product.batch_number || '',
       expiry_date: product.expiry_date || '',
+      image_url: product.image_url || '',
       carton_pack_qty: product.carton_pack_qty || '',
       low_stock_threshold: String(product.low_stock_threshold),
       tax_rate: String(product.tax_rate),
-      unit: product.unit || 'pcs',
-      category_id: product.category_id ? String(product.category_id) : '',
       is_active: product.is_active !== false
     });
     setFormError('');
@@ -245,46 +301,35 @@ export function ProductsPage({ onNavigateToHistory }) {
 
     try {
       setIsSubmitting(true);
+      const payload = {
+        name: form.name.trim(),
+        sku: form.sku.trim(),
+        barcode: form.barcode?.trim() || null,
+        category_id: form.category_id ? parseInt(form.category_id, 10) : null,
+        sub_category_id: form.sub_category_id ? parseInt(form.sub_category_id, 10) : null,
+        brand_id: form.brand_id ? parseInt(form.brand_id, 10) : null,
+        brand: form.brand?.trim() || null,
+        unit_id: form.unit_id ? parseInt(form.unit_id, 10) : null,
+        unit: form.unit || 'pcs',
+        description: form.description?.trim() || null,
+        cost_price: parseFloat(form.cost_price) || 0,
+        selling_price: sellPrice,
+        wholesale_price: form.wholesale_price ? parseFloat(form.wholesale_price) : null,
+        batch_number: form.batch_number?.trim() || null,
+        expiry_date: form.expiry_date || null,
+        image_url: form.image_url?.trim() || null,
+        carton_pack_qty: form.carton_pack_qty ? parseInt(form.carton_pack_qty, 10) : null,
+        low_stock_threshold: parseInt(form.low_stock_threshold, 10) || 5,
+        tax_rate: parseFloat(form.tax_rate) || 0,
+        is_active: form.is_active
+      };
+
       if (selectedProduct) {
-        await productService.update(selectedProduct.id, {
-          name: form.name.trim(),
-          sku: form.sku.trim(),
-          barcode: form.barcode.trim() || null,
-          brand: form.brand.trim() || null,
-          description: form.description.trim() || null,
-          cost_price: parseFloat(form.cost_price) || 0,
-          selling_price: sellPrice,
-          wholesale_price: form.wholesale_price ? parseFloat(form.wholesale_price) : null,
-          batch_number: form.batch_number.trim() || null,
-          expiry_date: form.expiry_date || null,
-          carton_pack_qty: form.carton_pack_qty ? parseInt(form.carton_pack_qty, 10) : null,
-          low_stock_threshold: parseInt(form.low_stock_threshold, 10) || 5,
-          tax_rate: parseFloat(form.tax_rate) || 0,
-          unit: form.unit,
-          category_id: form.category_id ? parseInt(form.category_id, 10) : null,
-          is_active: form.is_active
-        });
+        await productService.update(selectedProduct.id, payload);
         toast.success(`Product "${form.name}" updated successfully.`);
       } else {
-        await productService.create({
-          name: form.name.trim(),
-          sku: form.sku.trim(),
-          barcode: form.barcode.trim() || null,
-          brand: form.brand.trim() || null,
-          description: form.description.trim() || null,
-          cost_price: parseFloat(form.cost_price) || 0,
-          selling_price: sellPrice,
-          wholesale_price: form.wholesale_price ? parseFloat(form.wholesale_price) : null,
-          batch_number: form.batch_number.trim() || null,
-          expiry_date: form.expiry_date || null,
-          carton_pack_qty: form.carton_pack_qty ? parseInt(form.carton_pack_qty, 10) : null,
-          quantity: parseInt(form.quantity, 10) || 0,
-          low_stock_threshold: parseInt(form.low_stock_threshold, 10) || 5,
-          tax_rate: parseFloat(form.tax_rate) || 0,
-          unit: form.unit,
-          category_id: form.category_id ? parseInt(form.category_id, 10) : null,
-          is_active: form.is_active
-        });
+        payload.quantity = parseInt(form.quantity, 10) || 0;
+        await productService.create(payload);
         toast.success(`Product "${form.name}" created successfully.`);
       }
       setModalType(null);
@@ -403,9 +448,10 @@ export function ProductsPage({ onNavigateToHistory }) {
             value={filterCategory}
             onChange={(e) => {
               setFilterCategory(e.target.value);
+              setFilterSubCategory('');
               setPage(1);
             }}
-            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:bg-white focus:border-slate-800 cursor-pointer min-w-[130px]"
+            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:bg-white focus:border-slate-800 cursor-pointer min-w-[120px]"
           >
             <option value="">All Categories</option>
             {categories.map((c) => (
@@ -416,12 +462,46 @@ export function ProductsPage({ onNavigateToHistory }) {
           </select>
 
           <select
+            value={filterSubCategory}
+            onChange={(e) => {
+              setFilterSubCategory(e.target.value);
+              setPage(1);
+            }}
+            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:bg-white focus:border-slate-800 cursor-pointer min-w-[120px]"
+          >
+            <option value="">All Sub-Categories</option>
+            {subCategories
+              .filter((sc) => !filterCategory || String(sc.category_id) === String(filterCategory))
+              .map((sc) => (
+                <option key={sc.id} value={sc.id}>
+                  {sc.name}
+                </option>
+              ))}
+          </select>
+
+          <select
+            value={filterBrand}
+            onChange={(e) => {
+              setFilterBrand(e.target.value);
+              setPage(1);
+            }}
+            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:bg-white focus:border-slate-800 cursor-pointer min-w-[110px]"
+          >
+            <option value="">All Brands</option>
+            {brands.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+
+          <select
             value={stockStatus}
             onChange={(e) => {
               setStockStatus(e.target.value);
               setPage(1);
             }}
-            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:bg-white focus:border-slate-800 cursor-pointer min-w-[130px]"
+            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:bg-white focus:border-slate-800 cursor-pointer min-w-[120px]"
           >
             <option value="">All Stock Levels</option>
             <option value="in_stock">In Stock Healthy</option>
@@ -429,13 +509,15 @@ export function ProductsPage({ onNavigateToHistory }) {
             <option value="out_of_stock">Out of Stock</option>
           </select>
 
-          {(search || filterCategory || stockStatus) && (
+          {(search || filterCategory || filterSubCategory || filterBrand || stockStatus) && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setSearch('');
                 setFilterCategory('');
+                setFilterSubCategory('');
+                setFilterBrand('');
                 setStockStatus('');
                 setPage(1);
               }}
@@ -487,7 +569,8 @@ export function ProductsPage({ onNavigateToHistory }) {
                 <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Item Details</th>
                   <th className="py-3 px-4">SKU / Barcode</th>
-                  <th className="py-3 px-4">Category</th>
+                  <th className="py-3 px-4">Category & Sub-Category</th>
+                  <th className="py-3 px-4">Brand</th>
                   <th className="py-3 px-4 text-right">Cost</th>
                   <th className="py-3 px-4 text-right">Selling Price</th>
                   <th className="py-3 px-4 text-center">In Stock</th>
@@ -503,14 +586,26 @@ export function ProductsPage({ onNavigateToHistory }) {
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900 leading-tight">
-                          {p.name}
-                        </div>
-                        {p.description && (
-                          <div className="text-[11px] text-slate-400 mt-0.5 line-clamp-1 max-w-xs">
-                            {p.description}
+                        <div className="flex items-center gap-2.5">
+                          {p.image_url ? (
+                            <img
+                              src={p.image_url}
+                              alt={p.name}
+                              className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : null}
+                          <div>
+                            <div className="font-semibold text-slate-900 leading-tight">
+                              {p.name}
+                            </div>
+                            {p.description && (
+                              <div className="text-[11px] text-slate-400 mt-0.5 line-clamp-1 max-w-xs">
+                                {p.description}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </td>
 
                       <td className="py-3 px-4">
@@ -525,8 +620,25 @@ export function ProductsPage({ onNavigateToHistory }) {
                       </td>
 
                       <td className="py-3 px-4">
-                        {p.category ? (
-                          <Badge variant="info">{p.category.name}</Badge>
+                        <div className="flex flex-col gap-1 items-start">
+                          {p.category ? (
+                            <Badge variant="info">{p.category.name}</Badge>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                          {p.sub_category?.name && (
+                            <span className="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              {p.sub_category.name}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4">
+                        {p.brand_rel?.name || p.brand ? (
+                          <span className="font-semibold text-slate-800 text-xs">
+                            {p.brand_rel?.name || p.brand}
+                          </span>
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
@@ -635,195 +747,320 @@ export function ProductsPage({ onNavigateToHistory }) {
         title={modalType === 'create' ? 'Add New Product' : `Edit Product: ${selectedProduct?.name}`}
         size="lg"
       >
-        <form onSubmit={handleSubmitProduct} className="space-y-4">
+        <form onSubmit={handleSubmitProduct} className="space-y-5">
           {formError && (
-            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium">
-              {formError}
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{formError}</span>
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2">
-              <Input
-                label="Product Name"
-                name="name"
-                value={form.name}
-                onChange={handleFormChange}
-                placeholder="e.g. Parle-G Gold Biscuits (Pack of 12)"
-                disabled={isSubmitting}
-                required
-              />
+          {/* Section 1: Basic Information */}
+          <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-indigo-600" /> 1. Basic Information
+              </h3>
+              <span className="text-[11px] text-slate-400">* Required fields</span>
             </div>
 
-            <Input
-              label="SKU (Stock Keeping Unit)"
-              name="sku"
-              value={form.sku}
-              onChange={handleFormChange}
-              placeholder="e.g. SKU-LOGI-MX3S"
-              disabled={isSubmitting}
-              required
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <Input
+                  label="Product Name *"
+                  name="name"
+                  value={form.name}
+                  onChange={handleFormChange}
+                  placeholder="e.g. Parle-G Gold Biscuits (Pack of 12)"
+                  disabled={isSubmitting}
+                  required
+                  autoFocus
+                />
+              </div>
 
-            <Input
-              label="Barcode / UPC / EAN"
-              name="barcode"
-              value={form.barcode}
-              onChange={handleFormChange}
-              placeholder="e.g. 097855160898"
-              disabled={isSubmitting}
-              icon={Barcode}
-            />
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-700">SKU (Stock Keeping Unit) *</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const prefix = (form.brand || form.name || 'SKU').slice(0, 3).toUpperCase().replace(/[^A-Z]/g, 'ITM');
+                      const rand = Math.floor(100000 + Math.random() * 900000);
+                      setForm(prev => ({ ...prev, sku: `${prefix}-${rand}` }));
+                    }}
+                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold"
+                  >
+                    Auto Generate
+                  </button>
+                </div>
+                <Input
+                  name="sku"
+                  value={form.sku}
+                  onChange={handleFormChange}
+                  placeholder="e.g. SKU-PARLE-01"
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
 
-            <Select
-              label="Category"
-              name="category_id"
-              value={form.category_id}
-              onChange={handleFormChange}
-              disabled={isSubmitting}
-              placeholder="Select category (Optional)"
-              options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
-            />
-
-            <Select
-              label="Inventory Unit"
-              name="unit"
-              value={form.unit}
-              onChange={handleFormChange}
-              disabled={isSubmitting}
-              options={UNITS}
-            />
-
-            <Input
-              label="Cost Price"
-              name="cost_price"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.cost_price}
-              onChange={handleFormChange}
-              placeholder="0.00"
-              disabled={isSubmitting}
-            />
-
-            <Input
-              label="Brand / Manufacturer"
-              name="brand"
-              value={form.brand}
-              onChange={handleFormChange}
-              placeholder="e.g. Parle, Cadbury, Frooti"
-              disabled={isSubmitting}
-            />
-
-            <Input
-              label="Selling Price"
-              name="selling_price"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.selling_price}
-              onChange={handleFormChange}
-              placeholder="0.00"
-              disabled={isSubmitting}
-              required
-            />
-
-            <Input
-              label="Wholesale Price"
-              name="wholesale_price"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.wholesale_price}
-              onChange={handleFormChange}
-              placeholder="0.00"
-              disabled={isSubmitting}
-              helperText="Bulk purchase rate"
-            />
-
-            <Input
-              label="Batch Number"
-              name="batch_number"
-              value={form.batch_number}
-              onChange={handleFormChange}
-              placeholder="e.g. B-2026-01"
-              disabled={isSubmitting}
-            />
-
-            <Input
-              label="Expiry Date"
-              name="expiry_date"
-              type="date"
-              value={form.expiry_date}
-              onChange={handleFormChange}
-              disabled={isSubmitting}
-            />
-
-            <Input
-              label="Pack / Carton Qty"
-              name="carton_pack_qty"
-              type="number"
-              min="1"
-              value={form.carton_pack_qty}
-              onChange={handleFormChange}
-              placeholder="e.g. 24"
-              disabled={isSubmitting}
-              helperText="Pieces per outer box"
-            />
-
-            {modalType === 'create' && (
               <Input
-                label="Initial Opening Quantity"
-                name="quantity"
+                label="Barcode / EAN"
+                name="barcode"
+                value={form.barcode}
+                onChange={handleFormChange}
+                placeholder="e.g. 8901719101014"
+                disabled={isSubmitting}
+                icon={Barcode}
+              />
+
+              <Select
+                label="Category"
+                name="category_id"
+                value={form.category_id}
+                onChange={handleCategoryChange}
+                disabled={isSubmitting}
+                placeholder="-- Select Category --"
+                options={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+              />
+
+              <Select
+                label="Sub-Category"
+                name="sub_category_id"
+                value={form.sub_category_id}
+                onChange={handleFormChange}
+                disabled={isSubmitting || !form.category_id}
+                placeholder={form.category_id ? "-- Select Sub-Category --" : "Select Category first"}
+                options={subCategories
+                  .filter((sc) => !form.category_id || String(sc.category_id) === String(form.category_id))
+                  .map((sc) => ({ value: String(sc.id), label: sc.name }))}
+              />
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Brand / Manufacturer</label>
+                <select
+                  value={form.brand_id}
+                  onChange={handleBrandChange}
+                  disabled={isSubmitting}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
+                >
+                  <option value="">-- Select Brand --</option>
+                  {brands.map((b) => (
+                    <option key={b.id} value={String(b.id)}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Input
+                label="Product Image URL (Optional)"
+                name="image_url"
+                value={form.image_url}
+                onChange={handleFormChange}
+                placeholder="https://images.example.com/item.jpg"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          {/* Section 2: Pricing & Wholesale */}
+          <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center justify-center">₹</span>
+                2. Pricing & Wholesale
+              </h3>
+              {(() => {
+                const cost = parseFloat(form.cost_price) || 0;
+                const sell = parseFloat(form.selling_price) || 0;
+                if (sell > 0 && cost > 0) {
+                  const margin = (((sell - cost) / cost) * 100).toFixed(1);
+                  return (
+                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                      Number(margin) >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      Margin: {margin}%
+                    </span>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <Input
+                  label="Selling Price *"
+                  name="selling_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.selling_price}
+                  onChange={handleFormChange}
+                  placeholder="0.00"
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+
+              <div>
+                <Input
+                  label="Cost Price"
+                  name="cost_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.cost_price}
+                  onChange={handleFormChange}
+                  placeholder="0.00"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div>
+                <Input
+                  label="Wholesale Price"
+                  name="wholesale_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.wholesale_price}
+                  onChange={handleFormChange}
+                  placeholder="0.00"
+                  disabled={isSubmitting}
+                  helperText="Bulk wholesale rate"
+                />
+              </div>
+
+              <div>
+                <Input
+                  label="Tax Rate (%)"
+                  name="tax_rate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={form.tax_rate}
+                  onChange={handleFormChange}
+                  placeholder="0.00"
+                  disabled={isSubmitting}
+                  helperText="e.g. 5, 12, 18, 28"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Stock, Packaging & Batch */}
+          <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <SlidersHorizontal className="w-4 h-4 text-purple-600" /> 3. Stock, Packaging & Batch
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Base Unit</label>
+                <select
+                  value={form.unit_id || ''}
+                  onChange={handleUnitChange}
+                  disabled={isSubmitting}
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
+                >
+                  <option value="">Select Unit</option>
+                  {units.map((u) => (
+                    <option key={u.id} value={String(u.id)}>
+                      {u.name} ({u.short_code})
+                    </option>
+                  ))}
+                  {units.length === 0 && UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Input
+                label="Pack / Carton Qty"
+                name="carton_pack_qty"
+                type="number"
+                min="1"
+                value={form.carton_pack_qty}
+                onChange={handleFormChange}
+                placeholder="e.g. 24"
+                disabled={isSubmitting}
+                helperText="Pieces per outer box"
+              />
+
+              {modalType === 'create' ? (
+                <Input
+                  label="Initial Opening Quantity"
+                  name="quantity"
+                  type="number"
+                  min="0"
+                  value={form.quantity}
+                  onChange={handleFormChange}
+                  placeholder="0"
+                  disabled={isSubmitting}
+                  helperText="Creates initial stock in warehouse"
+                />
+              ) : (
+                <div className="flex flex-col justify-center">
+                  <span className="text-xs font-semibold text-slate-700">Current Stock</span>
+                  <p className="text-sm font-bold text-slate-900 mt-1 font-mono">
+                    {selectedProduct?.quantity ?? 0} {form.unit}
+                  </p>
+                  <span className="text-[10px] text-slate-400">Use 'Adjust Stock' button to change</span>
+                </div>
+              )}
+
+              <Input
+                label="Low Stock Alert Threshold"
+                name="low_stock_threshold"
                 type="number"
                 min="0"
-                value={form.quantity}
+                value={form.low_stock_threshold}
                 onChange={handleFormChange}
-                placeholder="0"
+                placeholder="5"
                 disabled={isSubmitting}
-                helperText="Opening quantity will log an immutable stock movement audit entry."
+                helperText="Alerts when stock is low"
               />
-            )}
 
-            <Input
-              label="Low Stock Alert Threshold"
-              name="low_stock_threshold"
-              type="number"
-              min="0"
-              value={form.low_stock_threshold}
-              onChange={handleFormChange}
-              placeholder="5"
-              disabled={isSubmitting}
-              helperText="Dashboard warns when stock drops to or below this level."
-            />
-
-            <Input
-              label="Tax Rate (%)"
-              name="tax_rate"
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={form.tax_rate}
-              onChange={handleFormChange}
-              placeholder="0.00"
-              disabled={isSubmitting}
-            />
-
-            <div className="sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                rows={2}
-                value={form.description}
+              <Input
+                label="Batch Number"
+                name="batch_number"
+                value={form.batch_number}
                 onChange={handleFormChange}
-                placeholder="Item specification, color, size, compatibility..."
+                placeholder="e.g. B-2026-01"
                 disabled={isSubmitting}
-                className="w-full text-sm bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-colors"
+              />
+
+              <Input
+                label="Expiry Date"
+                name="expiry_date"
+                type="date"
+                value={form.expiry_date}
+                onChange={handleFormChange}
+                disabled={isSubmitting}
               />
             </div>
+          </div>
+
+          {/* Section 4: Description (Optional) */}
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">
+              Description (Optional)
+            </label>
+            <textarea
+              name="description"
+              rows={2}
+              value={form.description}
+              onChange={handleFormChange}
+              placeholder="Flavor, variant, weight, packaging details..."
+              disabled={isSubmitting}
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors resize-none"
+            />
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -954,6 +1191,16 @@ export function ProductsPage({ onNavigateToHistory }) {
           size="md"
         >
           <div className="space-y-4">
+            {selectedProduct.image_url && (
+              <div className="flex justify-center p-2 bg-slate-50 rounded-xl border border-slate-200">
+                <img
+                  src={selectedProduct.image_url}
+                  alt={selectedProduct.name}
+                  className="max-h-36 object-contain rounded"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
               <div>
                 <span className="text-slate-400">SKU</span>
@@ -967,6 +1214,18 @@ export function ProductsPage({ onNavigateToHistory }) {
                 <span className="text-slate-400">Category</span>
                 <p className="font-medium text-slate-800 mt-0.5">
                   {selectedProduct.category ? selectedProduct.category.name : 'Uncategorized'}
+                </p>
+              </div>
+              <div>
+                <span className="text-slate-400">Sub-Category</span>
+                <p className="font-medium text-slate-800 mt-0.5">
+                  {selectedProduct.sub_category?.name || '—'}
+                </p>
+              </div>
+              <div>
+                <span className="text-slate-400">Brand</span>
+                <p className="font-semibold text-slate-800 mt-0.5">
+                  {selectedProduct.brand_rel?.name || selectedProduct.brand || '—'}
                 </p>
               </div>
               <div>
@@ -991,12 +1250,6 @@ export function ProductsPage({ onNavigateToHistory }) {
                 <span className="text-slate-400">Low Stock Alert</span>
                 <p className="font-mono text-slate-800 mt-0.5">{selectedProduct.low_stock_threshold} {selectedProduct.unit}</p>
               </div>
-              {selectedProduct.brand && (
-                <div>
-                  <span className="text-slate-400">Brand</span>
-                  <p className="font-semibold text-slate-800 mt-0.5">{selectedProduct.brand}</p>
-                </div>
-              )}
               {selectedProduct.wholesale_price && (
                 <div>
                   <span className="text-slate-400">Wholesale Price</span>

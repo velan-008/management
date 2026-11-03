@@ -2,6 +2,7 @@ import api from './api.js';
 
 export const productService = {
   list: (params) => api.get('/products', { params }),
+  search: (q, params) => api.get('/products/search', { params: { q, ...params } }),
   getById: (id) => api.get(`/products/${id}`),
   create: (data) => api.post('/products', data),
   update: (id, data) => api.put(`/products/${id}`, data),
@@ -17,11 +18,35 @@ export const productService = {
 };
 
 export const categoryService = {
-  list: () => api.get('/categories'),
+  list: (params) => api.get('/categories', { params }),
   getById: (id) => api.get(`/categories/${id}`),
   create: (data) => api.post('/categories', data),
   update: (id, data) => api.put(`/categories/${id}`, data),
   delete: (id) => api.delete(`/categories/${id}`)
+};
+
+export const subCategoryService = {
+  list: (params) => api.get('/sub-categories', { params }),
+  getById: (id) => api.get(`/sub-categories/${id}`),
+  create: (data) => api.post('/sub-categories', data),
+  update: (id, data) => api.put(`/sub-categories/${id}`, data),
+  delete: (id) => api.delete(`/sub-categories/${id}`)
+};
+
+export const brandService = {
+  list: (params) => api.get('/brands', { params }),
+  getById: (id) => api.get(`/brands/${id}`),
+  create: (data) => api.post('/brands', data),
+  update: (id, data) => api.put(`/brands/${id}`, data),
+  delete: (id) => api.delete(`/brands/${id}`)
+};
+
+export const unitService = {
+  list: (params) => api.get('/units', { params }),
+  getById: (id) => api.get(`/units/${id}`),
+  create: (data) => api.post('/units', data),
+  update: (id, data) => api.put(`/units/${id}`, data),
+  delete: (id) => api.delete(`/units/${id}`)
 };
 
 export const customerService = {
@@ -39,6 +64,12 @@ export const saleService = {
   create: (data) => api.post('/sales', data),
   addPayment: (id, data) => api.post(`/sales/${id}/payments`, data),
   refund: (id, data) => api.post(`/sales/${id}/refund`, data)
+};
+
+export const invoiceService = {
+  list: (params) => api.get('/invoices', { params }),
+  getById: (id) => api.get(`/invoices/${id}`),
+  create: (data) => api.post('/invoices', data)
 };
 
 export const expenseService = {

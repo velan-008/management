@@ -21,6 +21,11 @@ Category.init(
     description: {
       type: DataTypes.STRING(255),
       allowNull: true
+    },
+    status: {
+      type: DataTypes.ENUM('ACTIVE', 'INACTIVE'),
+      allowNull: false,
+      defaultValue: 'ACTIVE'
     }
   },
   {

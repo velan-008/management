@@ -2,14 +2,14 @@
 
 All endpoints are prefixed with `/api`. All requests and responses use JSON content type (`Content-Type: application/json`) unless requesting binary PDF output.
 
----
+---mm
 
 ## 1. Universal Response Envelope Standards
 
 ### Success Response Envelope
 ```json
 {
-  "success": true,
+  "success": true, 
   "message": "Operation completed successfully",
   "data": {},
   "meta": {

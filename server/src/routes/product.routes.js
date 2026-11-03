@@ -26,6 +26,7 @@ router.delete('/categories/:id', authorizeRoles('ADMIN'), categoryController.del
 router.get('/movements', productController.allMovements);
 
 // Product CRUD routes
+router.get('/search', productController.search);
 router.get('/', productController.list);
 router.get('/:id', productController.getById);
 router.post('/', authorizeRoles('ADMIN', 'STAFF'), validate(createProductSchema), productController.create);

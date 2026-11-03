@@ -12,6 +12,7 @@ function CustomerForm({ customer, onSave, onClose }) {
     phone: customer?.phone || '',
     email: customer?.email || '',
     address: customer?.address || '',
+    customer_type: customer?.customer_type === 'WHOLESALE' || customer?.customer_type === 'SUB_WHOLESALER' || customer?.customer_type === 'BULK' ? 'WHOLESALE' : 'RETAIL',
     credit_limit: customer?.credit_limit || 0
   });
   const [loading, setLoading] = useState(false);
@@ -52,16 +53,27 @@ function CustomerForm({ customer, onSave, onClose }) {
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
             placeholder="email@example.com" />
         </div>
-        <div className="col-span-2">
-          <label className="block text-xs font-medium text-slate-700 mb-1">Address</label>
-          <textarea value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} rows={2}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
-            placeholder="Full address" />
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">Customer Type *</label>
+          <select
+            value={form.customer_type}
+            onChange={e => setForm(f => ({ ...f, customer_type: e.target.value }))}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+          >
+            <option value="RETAIL">Retail Customer</option>
+            <option value="WHOLESALE">Wholesale Customer</option>
+          </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Credit Limit</label>
           <input type="number" min="0" step="0.01" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: e.target.value }))}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-slate-700 mb-1">Address</label>
+          <textarea value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} rows={2}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+            placeholder="Full address" />
         </div>
       </div>
       <div className="flex gap-2 pt-2">
@@ -158,6 +170,7 @@ export function CustomersPage() {
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Contact</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Outstanding</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Credit Limit</th>
@@ -167,57 +180,72 @@ export function CustomersPage() {
             <tbody className="divide-y divide-slate-50">
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i}>{Array.from({ length: 5 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>
+                  <tr key={i}>{Array.from({ length: 6 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="h-4 bg-slate-100 rounded animate-pulse" /></td>)}</tr>
                 ))
               ) : customers.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-12 text-center">
+                <tr><td colSpan={6} className="px-4 py-12 text-center">
                   <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                   <p className="text-slate-500">No customers yet</p>
                 </td></tr>
               ) : (
-                customers.map(c => (
-                  <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold flex items-center justify-center shrink-0">
-                          {c.name.charAt(0).toUpperCase()}
+                customers.map(c => {
+                  const isWholesale = c.customer_type === 'WHOLESALE' || c.customer_type === 'SUB_WHOLESALER' || c.customer_type === 'BULK';
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold flex items-center justify-center shrink-0">
+                            {c.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-900">{c.name}</p>
+                            {c.address && <p className="text-[11px] text-slate-400 truncate max-w-xs">{c.address}</p>}
+                          </div>
                         </div>
-                        <p className="font-medium text-slate-900">{c.name}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {c.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{c.phone}</div>}
-                      {c.email && <div className="flex items-center gap-1 text-xs"><Mail className="w-3 h-3" />{c.email}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {parseFloat(c.outstanding_balance) > 0 ? (
-                        <span className="text-amber-600 font-medium font-mono">{currency}{parseFloat(c.outstanding_balance).toFixed(2)}</span>
-                      ) : (
-                        <span className="text-emerald-600 text-xs">Settled</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-600">{currency}{parseFloat(c.credit_limit || 0).toFixed(2)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => handleOpenView(c)}
-                          title="View statement & purchases"
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => { setSelected(c); setModal('edit'); }}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(c)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          isWholesale
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          {isWholesale ? 'Wholesale' : 'Retail'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {c.phone && <div className="flex items-center gap-1"><Phone className="w-3 h-3" />{c.phone}</div>}
+                        {c.email && <div className="flex items-center gap-1 text-xs"><Mail className="w-3 h-3" />{c.email}</div>}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {parseFloat(c.outstanding_balance) > 0 ? (
+                          <span className="text-amber-600 font-medium font-mono">{currency}{parseFloat(c.outstanding_balance).toFixed(2)}</span>
+                        ) : (
+                          <span className="text-emerald-600 text-xs">Settled</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono text-slate-600">{currency}{parseFloat(c.credit_limit || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleOpenView(c)}
+                            title="View statement & purchases"
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => { setSelected(c); setModal('edit'); }}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(c)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -249,7 +277,13 @@ export function CustomersPage() {
       >
         {selected && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+              <div>
+                <span className="text-slate-400">Customer Type</span>
+                <p className="font-semibold text-slate-800 mt-0.5">
+                  {selected.customer_type === 'WHOLESALE' || selected.customer_type === 'SUB_WHOLESALER' || selected.customer_type === 'BULK' ? 'Wholesale' : 'Retail'}
+                </p>
+              </div>
               <div>
                 <span className="text-slate-400">Phone</span>
                 <p className="font-semibold text-slate-800 mt-0.5">{selected.phone || '—'}</p>

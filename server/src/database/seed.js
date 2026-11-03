@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import {
   sequelize, Business, User, Category, Product, Customer, Employee, Sale, SaleItem, Payment, Expense,
-  Supplier, Purchase, PurchaseItem, SupplierPayment
+  Supplier, Purchase, PurchaseItem, SupplierPayment, ProductUnit, Inventory,
+  SubCategory, Brand, Unit
 } from '../models/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -117,6 +118,171 @@ export const seedDatabase = async () => {
     }
   });
 
+  // Default FMCG Categories
+  const fmcgCategoriesData = [
+    { name: 'Chocolates', description: 'Chocolates and confectionery' },
+    { name: 'Biscuits', description: 'Glucose, Marie, Cream & Butter Cookies' },
+    { name: 'Soft Drinks', description: 'Carbonated soft drinks, cola, and beverages' },
+    { name: 'Snacks', description: 'Chips, namkeen, puffs and savory snacks' },
+    { name: 'Candies', description: 'Hard candies, toffees and mints' },
+    { name: 'Cakes', description: 'Packaged cakes, muffins and brownies' },
+    { name: 'Juices', description: 'Fruit juices, nectar and pulp drinks' },
+    { name: 'Ice Cream', description: 'Cups, cones and family pack ice creams' },
+    { name: 'Noodles', description: 'Instant noodles, cup noodles and pasta' },
+    { name: 'Dairy Products', description: 'Milk, cheese, butter and dairy beverages' },
+    { name: 'Tea & Coffee', description: 'Tea leaves, dust and instant coffee' },
+    { name: 'Bakery Products', description: 'Breads, buns, rusks and bakery essentials' },
+    { name: 'Packaged Drinking Water', description: 'Mineral water, purified water bottles and cans' }
+  ];
+
+  const categoryMap = {
+    'Chocolates & Confectionery': catChocolates,
+    'Biscuits & Cookies': catBiscuits,
+    'Beverages & Soft Drinks': catBeverages,
+    'Snacks & Namkeen': catSnacks
+  };
+
+  for (const catData of fmcgCategoriesData) {
+    const [c] = await Category.findOrCreate({
+      where: { business_id: business1.id, name: catData.name },
+      defaults: {
+        business_id: business1.id,
+        name: catData.name,
+        description: catData.description,
+        status: 'ACTIVE'
+      }
+    });
+    categoryMap[catData.name] = c;
+  }
+
+  // Default FMCG Sub-Categories
+  const fmcgSubCategoriesData = [
+    { category: 'Chocolates', name: 'Chocolate Bars', description: 'Solid milk and dark chocolate bars' },
+    { category: 'Chocolates', name: 'Wafer Chocolates', description: 'Crispy wafer chocolate bars' },
+    { category: 'Chocolates', name: 'Chocolate Boxes', description: 'Gift packs and chocolate boxes' },
+    { category: 'Biscuits', name: 'Cream Biscuits', description: 'Sandwich cream biscuits' },
+    { category: 'Biscuits', name: 'Glucose Biscuits', description: 'Everyday energy glucose biscuits' },
+    { category: 'Biscuits', name: 'Cookies', description: 'Butter and chocolate chip cookies' },
+    { category: 'Soft Drinks', name: 'Cola', description: 'Carbonated cola drinks' },
+    { category: 'Soft Drinks', name: 'Orange Drinks', description: 'Sparkling orange flavored soft drinks' },
+    { category: 'Soft Drinks', name: 'Lemon Drinks', description: 'Clear lime and lemon soda' },
+    { category: 'Snacks', name: 'Chips', description: 'Crispy potato wafers and chips' },
+    { category: 'Snacks', name: 'Namkeen', description: 'Traditional bhujia, sev and mixtures' },
+    { category: 'Snacks', name: 'Puffs', description: 'Extruded corn and cheese puffs' },
+    { category: 'Juices', name: 'Fruit Juice', description: '100% natural fruit juice' },
+    { category: 'Juices', name: 'Juice Drinks', description: 'Sweetened fruit juice beverages' },
+    { category: 'Candies', name: 'Hard Candies', description: 'Fruit drops and hard candies' },
+    { category: 'Candies', name: 'Chewy Candies', description: 'Toffees and chews' },
+    { category: 'Candies', name: 'Lollipops', description: 'Assorted fruit lollipops' },
+    { category: 'Cakes', name: 'Cupcakes', description: 'Single-serve frosted cupcakes' },
+    { category: 'Cakes', name: 'Sponge Cakes', description: 'Layer sponge and pound cakes' },
+    { category: 'Cakes', name: 'Fruit Cakes', description: 'Enriched fruit and plum cakes' },
+    { category: 'Ice Cream', name: 'Cones', description: 'Waffle and biscuit cone ice creams' },
+    { category: 'Ice Cream', name: 'Cups', description: 'Single serve ice cream cups' },
+    { category: 'Ice Cream', name: 'Family Packs', description: 'Tub and brick family pack ice creams' },
+    { category: 'Noodles', name: 'Instant Noodles', description: 'Quick cooking masala noodles' },
+    { category: 'Noodles', name: 'Cup Noodles', description: 'Ready-to-eat hot cup noodles' },
+    { category: 'Noodles', name: 'Hakka Noodles', description: 'Wok tossed and stir fry noodles' },
+    { category: 'Dairy Products', name: 'Milk', description: 'Pasteurized packaged milk' },
+    { category: 'Dairy Products', name: 'Butter', description: 'Salted and unsalted table butter' },
+    { category: 'Dairy Products', name: 'Cheese', description: 'Processed and mozzarella cheese blocks' },
+    { category: 'Dairy Products', name: 'Curd', description: 'Natural and probiotic cup curd' },
+    { category: 'Tea & Coffee', name: 'Black Tea', description: 'Leaf and CTC black tea blends' },
+    { category: 'Tea & Coffee', name: 'Green Tea', description: 'Antioxidant rich green tea bags' },
+    { category: 'Tea & Coffee', name: 'Instant Coffee', description: 'Aromatic instant coffee granules' },
+    { category: 'Tea & Coffee', name: 'Roast Coffee', description: 'Filter and ground roast coffee' },
+    { category: 'Bakery Products', name: 'Breads', description: 'White, brown and whole wheat breads' },
+    { category: 'Bakery Products', name: 'Buns', description: 'Burger and pav buns' },
+    { category: 'Bakery Products', name: 'Rusks', description: 'Crispy toasted tea rusks' },
+    { category: 'Packaged Drinking Water', name: '500ml Bottle', description: '500ml pet water bottles' },
+    { category: 'Packaged Drinking Water', name: '1 Litre Bottle', description: '1 litre packaged water bottles' },
+    { category: 'Packaged Drinking Water', name: '20L Can', description: '20 litre dispenser water jars' }
+  ];
+
+  const subCategoryMap = {};
+  for (const sc of fmcgSubCategoriesData) {
+    const parentCat = categoryMap[sc.category];
+    if (parentCat) {
+      const [item] = await SubCategory.findOrCreate({
+        where: { business_id: business1.id, category_id: parentCat.id, name: sc.name },
+        defaults: {
+          business_id: business1.id,
+          category_id: parentCat.id,
+          name: sc.name,
+          description: sc.description,
+          status: 'ACTIVE'
+        }
+      });
+      subCategoryMap[sc.name] = item;
+    }
+  }
+
+  // Default FMCG Brands
+  const fmcgBrandsData = [
+    { name: 'Cadbury', description: 'Mondelez confectionery brand' },
+    { name: 'Nestlé', description: 'Global food and beverage manufacturer' },
+    { name: 'KitKat', description: 'Crisp wafer chocolate brand' },
+    { name: 'Dairy Milk', description: 'Flagship milk chocolate brand' },
+    { name: 'Britannia', description: 'Biscuits, dairy and bakery brand' },
+    { name: 'Oreo', description: 'Cream sandwich biscuit brand' },
+    { name: 'Coca-Cola', description: 'Carbonated soft drink brand' },
+    { name: 'Pepsi', description: 'Global beverage brand' },
+    { name: 'Fanta', description: 'Fruit-flavored carbonated beverage' },
+    { name: 'Sprite', description: 'Lemon-lime flavored soft drink' },
+    { name: "Lay's", description: 'Potato chips brand' },
+    { name: 'Bingo', description: 'ITC finger snacks and chips' },
+    { name: 'Parle', description: 'Parle-G, biscuits and confectionery' },
+    { name: 'Amul', description: 'The Taste of India dairy products' },
+    { name: 'Maggi', description: 'Instant noodles and culinary products' },
+    { name: "Haldiram's", description: 'Traditional Indian namkeen and sweets' }
+  ];
+
+  const brandMap = {};
+  for (const b of fmcgBrandsData) {
+    const [brandItem] = await Brand.findOrCreate({
+      where: { business_id: business1.id, name: b.name },
+      defaults: {
+        business_id: business1.id,
+        name: b.name,
+        description: b.description,
+        status: 'ACTIVE'
+      }
+    });
+    brandMap[b.name] = brandItem;
+  }
+
+  // Default FMCG Units
+  const fmcgUnitsData = [
+    { name: 'Pcs', code: 'PCS', description: 'Individual piece count' },
+    { name: 'Pack', code: 'PACK', description: 'Consumer unit pack' },
+    { name: 'Box', code: 'BOX', description: 'Intermediate box packing' },
+    { name: 'Carton', code: 'CTN', description: 'Master wholesale carton' },
+    { name: 'Bottle', code: 'BTL', description: 'Bottle container' },
+    { name: 'Can', code: 'CAN', description: 'Tin / aluminum beverage can' },
+    { name: 'Crate', code: 'CRT', description: 'Reusable beverage crate' },
+    { name: 'Kg', code: 'KG', description: 'Kilogram metric weight' },
+    { name: 'Gram', code: 'GM', description: 'Gram weight' },
+    { name: 'Litre', code: 'L', description: 'Litre volumetric measure' },
+    { name: 'Ml', code: 'ML', description: 'Millilitre volumetric measure' },
+    { name: 'Dozen', code: 'DOZ', description: 'Pack of 12 units' },
+    { name: 'Bundle', code: 'BDL', description: 'Wholesale tied bundle' }
+  ];
+
+  const unitMap = {};
+  for (const u of fmcgUnitsData) {
+    const [unitItem] = await Unit.findOrCreate({
+      where: { business_id: business1.id, code: u.code },
+      defaults: {
+        business_id: business1.id,
+        name: u.name,
+        code: u.code,
+        description: u.description,
+        status: 'ACTIVE'
+      }
+    });
+    unitMap[u.code] = unitItem;
+  }
+
   // Wholesale Products for Business 1
   const [prodParleG] = await Product.findOrCreate({
     where: { business_id: business1.id, sku: 'SKU-BIS-PARLE10' },
@@ -229,6 +395,95 @@ export const seedDatabase = async () => {
     }
   });
 
+  // Product Units & Batches for Wholesale Products
+  // 1. Parle-G Units (PCS, BOX, CTN)
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodParleG.id, unit_name: 'PCS' },
+    defaults: { product_id: prodParleG.id, unit_name: 'PCS', conversion_factor: 1, wholesale_price: 2.00, retail_price: 2.50 }
+  });
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodParleG.id, unit_name: 'BOX' },
+    defaults: { product_id: prodParleG.id, unit_name: 'BOX', conversion_factor: 12, wholesale_price: 24.00, retail_price: 28.00 }
+  });
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodParleG.id, unit_name: 'CTN' },
+    defaults: { product_id: prodParleG.id, unit_name: 'CTN', conversion_factor: 144, wholesale_price: 270.00, retail_price: 320.00 }
+  });
+
+  // Parle-G Batches in Inventory
+  await Inventory.findOrCreate({
+    where: { business_id: business1.id, product_id: prodParleG.id, batch_number: 'BATCH-2026-PG1' },
+    defaults: {
+      business_id: business1.id,
+      product_id: prodParleG.id,
+      batch_number: 'BATCH-2026-PG1',
+      expiry_date: '2027-02-28',
+      stock_quantity: 1500
+    }
+  });
+  await Inventory.findOrCreate({
+    where: { business_id: business1.id, product_id: prodParleG.id, batch_number: 'BATCH-2026-PG2' },
+    defaults: {
+      business_id: business1.id,
+      product_id: prodParleG.id,
+      batch_number: 'BATCH-2026-PG2',
+      expiry_date: '2026-11-20',
+      stock_quantity: 300
+    }
+  });
+
+  // 2. Cadbury Dairy Milk Silk Units (PCS, BOX, CTN)
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodDairyMilk.id, unit_name: 'PCS' },
+    defaults: { product_id: prodDairyMilk.id, unit_name: 'PCS', conversion_factor: 1, wholesale_price: 70.00, retail_price: 80.00 }
+  });
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodDairyMilk.id, unit_name: 'BOX' },
+    defaults: { product_id: prodDairyMilk.id, unit_name: 'BOX', conversion_factor: 24, wholesale_price: 1680.00, retail_price: 1920.00 }
+  });
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodDairyMilk.id, unit_name: 'CTN' },
+    defaults: { product_id: prodDairyMilk.id, unit_name: 'CTN', conversion_factor: 240, wholesale_price: 16000.00, retail_price: 18500.00 }
+  });
+
+  // Cadbury Batches in Inventory
+  await Inventory.findOrCreate({
+    where: { business_id: business1.id, product_id: prodDairyMilk.id, batch_number: 'BATCH-CAD-402' },
+    defaults: {
+      business_id: business1.id,
+      product_id: prodDairyMilk.id,
+      batch_number: 'BATCH-CAD-402',
+      expiry_date: '2026-12-31',
+      stock_quantity: 960
+    }
+  });
+
+  // 3. Kurkure Units (PCS, BOX, CTN)
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodKurkure.id, unit_name: 'PCS' },
+    defaults: { product_id: prodKurkure.id, unit_name: 'PCS', conversion_factor: 1, wholesale_price: 16.00, retail_price: 20.00 }
+  });
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodKurkure.id, unit_name: 'BOX' },
+    defaults: { product_id: prodKurkure.id, unit_name: 'BOX', conversion_factor: 40, wholesale_price: 640.00, retail_price: 760.00 }
+  });
+  await ProductUnit.findOrCreate({
+    where: { product_id: prodKurkure.id, unit_name: 'CTN' },
+    defaults: { product_id: prodKurkure.id, unit_name: 'CTN', conversion_factor: 240, wholesale_price: 3600.00, retail_price: 4300.00 }
+  });
+
+  // Kurkure Batches in Inventory
+  await Inventory.findOrCreate({
+    where: { business_id: business1.id, product_id: prodKurkure.id, batch_number: 'BATCH-KURK-08' },
+    defaults: {
+      business_id: business1.id,
+      product_id: prodKurkure.id,
+      batch_number: 'BATCH-KURK-08',
+      expiry_date: '2026-10-15',
+      stock_quantity: 120
+    }
+  });
+
   // Customer for Business 1
   const [customerAcme] = await Customer.findOrCreate({
     where: { business_id: business1.id, name: 'Acme Corporation' },
@@ -240,9 +495,47 @@ export const seedDatabase = async () => {
       tax_number: 'GST-ACME-44',
       address: '42 Wallaby Way, Sydney',
       state: 'California',
+      customer_type: 'BULK',
       credit_limit: 5000.00,
+      outstanding_balance: 1200.00,
+      store_credit: 0.00,
+      status: 'ACTIVE'
+    }
+  });
+
+  const [customerMetro] = await Customer.findOrCreate({
+    where: { business_id: business1.id, name: 'Metro Supermarket' },
+    defaults: {
+      business_id: business1.id,
+      name: 'Metro Supermarket',
+      email: 'orders@metrosuper.com',
+      phone: '+1-555-9922',
+      tax_number: 'GST-METRO-99',
+      address: '74 Market Square, Downtown',
+      state: 'California',
+      customer_type: 'SUB_WHOLESALER',
+      credit_limit: 15000.00,
+      outstanding_balance: 13500.00, // Near limit (90%)!
+      store_credit: 0.00,
+      status: 'ACTIVE'
+    }
+  });
+
+  const [customerCityRetail] = await Customer.findOrCreate({
+    where: { business_id: business1.id, name: 'City Retail Mart' },
+    defaults: {
+      business_id: business1.id,
+      name: 'City Retail Mart',
+      email: 'contact@cityretailmart.com',
+      phone: '+1-555-4411',
+      tax_number: 'GST-CITY-21',
+      address: '12 Avenue Central, California',
+      state: 'California',
+      customer_type: 'REGULAR',
+      credit_limit: 2000.00,
       outstanding_balance: 0.00,
-      store_credit: 0.00
+      store_credit: 0.00,
+      status: 'ACTIVE'
     }
   });
 

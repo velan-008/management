@@ -19,9 +19,16 @@ Business.init(
     },
     email: {
       type: DataTypes.STRING(120),
-      allowNull: false,
+      allowNull: true,
       validate: {
-        isEmail: true
+        isEmailIfProvided(value) {
+          if (value && typeof value === 'string' && value.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(value.trim())) {
+              throw new Error('Please enter a valid email address');
+            }
+          }
+        }
       }
     },
     phone: {

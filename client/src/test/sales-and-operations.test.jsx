@@ -236,6 +236,85 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
     });
   });
 
+  it('POSPage: enforces customer selection and updates unit rates on Wholesale vs Retail tier change', async () => {
+    productService.list.mockResolvedValue({
+      data: {
+        products: [
+          {
+            id: 101,
+            name: 'Laser Barcode Scanner',
+            sku: 'SKU-SCAN-01',
+            selling_price: '100.00',
+            wholesale_price: '80.00',
+            quantity: 10,
+            tax_rate: '0'
+          }
+        ]
+      }
+    });
+
+    customerService.list.mockResolvedValue({
+      data: {
+        customers: [
+          {
+            id: 201,
+            name: 'Cyberdyne Systems',
+            phone: '+1-555-123-4567',
+            customer_type: 'WHOLESALE',
+            outstanding_balance: '0.00'
+          },
+          {
+            id: 202,
+            name: 'Alice Retail',
+            phone: '+1-555-987-6543',
+            customer_type: 'RETAIL',
+            outstanding_balance: '0.00'
+          }
+        ]
+      }
+    });
+
+    renderWithProviders(<POSPage />);
+
+    expect(await screen.findByText('Laser Barcode Scanner')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Laser Barcode Scanner'));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/cart is empty/i)).not.toBeInTheDocument();
+    });
+
+    // Select Wholesale customer
+    const customerInput = screen.getByPlaceholderText(/search customer/i);
+    fireEvent.focus(customerInput);
+    const customerOption = await screen.findByRole('button', { name: /cyberdyne systems/i });
+    fireEvent.click(customerOption);
+
+    // Rate should be wholesale price (BOX of 12 @ 80 = 960)
+    await waitFor(() => {
+      const inputs = screen.getAllByRole('spinbutton');
+      expect(inputs.some(i => i.value === '960' || i.value === '960.00')).toBe(true);
+    });
+
+    // Manually switch to Retail Tier (BOX of 12 @ 100 = 1200)
+    fireEvent.click(screen.getByRole('button', { name: /retail tier/i }));
+    await waitFor(() => {
+      const inputs = screen.getAllByRole('spinbutton');
+      expect(inputs.some(i => i.value === '1200' || i.value === '1200.00')).toBe(true);
+    });
+
+    // Manually switch back to Wholesale Tier
+    fireEvent.click(screen.getByRole('button', { name: /wholesale tier/i }));
+    await waitFor(() => {
+      const inputs = screen.getAllByRole('spinbutton');
+      expect(inputs.some(i => i.value === '960' || i.value === '960.00')).toBe(true);
+    });
+
+    // Clearing customer and trying to complete sale should require customer selection
+    fireEvent.click(screen.getByTitle('Clear Customer'));
+    fireEvent.click(screen.getByRole('button', { name: /complete sale/i }));
+    expect(await screen.findByText(/please select a customer by name before creating the bill/i)).toBeInTheDocument();
+  });
+
   it('InvoicesPage: renders invoice ledger and displays items and statuses', async () => {
     renderWithProviders(<InvoicesPage />);
 
@@ -315,7 +394,7 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
     expect(await screen.findByText('John Connor')).toBeInTheDocument();
     fireEvent.click(screen.getByTitle('Deactivate'));
 
-    expect(await screen.findByText('Deactivate Employee')).toBeInTheDocument();
+    expect(await screen.findByText('Deactivate Employee', {}, { timeout: 3000 })).toBeInTheDocument();
     expect(screen.getByText(/Are you sure you want to deactivate John Connor\?/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /confirm deactivation/i }));

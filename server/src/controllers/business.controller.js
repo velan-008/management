@@ -38,8 +38,8 @@ export const businessController = {
       if (name !== undefined && typeof name === 'string' && name.trim()) {
         updateData.name = name.trim();
       }
-      if (email !== undefined && typeof email === 'string' && email.trim()) {
-        updateData.email = email.trim().toLowerCase();
+      if (email !== undefined) {
+        updateData.email = email && typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : null;
       }
       if (phone !== undefined) {
         updateData.phone = phone && typeof phone === 'string' ? phone.trim() : null;

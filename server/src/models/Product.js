@@ -44,6 +44,15 @@ Product.init(
       allowNull: false,
       defaultValue: 0.00
     },
+    retail_price: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.selling_price;
+      },
+      set(val) {
+        this.setDataValue('selling_price', val);
+      }
+    },
     quantity: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -88,6 +97,32 @@ Product.init(
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 1
+    },
+    base_unit: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'PCS'
+    },
+    status: {
+      type: DataTypes.ENUM('ACTIVE', 'INACTIVE'),
+      allowNull: false,
+      defaultValue: 'ACTIVE'
+    },
+    sub_category_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true
+    },
+    brand_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true
+    },
+    unit_id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true
+    },
+    image_url: {
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     is_active: {
       type: DataTypes.BOOLEAN,

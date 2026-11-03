@@ -91,6 +91,34 @@ SaleItem.init(
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0.00
+    },
+    batch_number: {
+      type: DataTypes.STRING(60),
+      allowNull: true
+    },
+    unit_name: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'PCS'
+    },
+    free_quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    },
+    conversion_factor: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 1.00
+    },
+    total_base_quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    },
+    total_price: {
+      type: DataTypes.DECIMAL(12, 2),
+      allowNull: true
     }
   },
   {

@@ -177,7 +177,11 @@ export const saleController = {
           }
 
           const qty = new Decimal(item.quantity);
-          const unitSellingPrice = new Decimal(item.unit_price !== undefined ? item.unit_price : product.selling_price);
+          let defaultPrice = product.selling_price;
+          if (customer && (customer.customer_type === 'WHOLESALE' || customer.customer_type === 'BULK' || customer.customer_type === 'SUB_WHOLESALER') && parseFloat(product.wholesale_price) > 0) {
+            defaultPrice = product.wholesale_price;
+          }
+          const unitSellingPrice = new Decimal(item.unit_price !== undefined ? item.unit_price : defaultPrice);
           const unitCostPrice = new Decimal(product.cost_price || 0);
           const discPct = new Decimal(item.discount_percent || 0);
 
@@ -224,7 +228,13 @@ export const saleController = {
             sgst_amount: lineSgst.toFixed(2),
             igst_amount: lineIgst.toFixed(2),
             tax_amount: lineTax.toFixed(2),
-            line_total: lineTotal.toFixed(2)
+            line_total: lineTotal.toFixed(2),
+            batch_number: item.batch_number || null,
+            unit_name: item.unit_name || 'PCS',
+            free_quantity: item.free_quantity || 0,
+            conversion_factor: item.conversion_factor || 1,
+            total_base_quantity: item.total_base_quantity || item.quantity,
+            total_price: lineTotal.toFixed(2)
           });
 
           // Deduct stock inside transaction and log immutable StockMovement
@@ -287,6 +297,11 @@ export const saleController = {
             igst_total: igstTotal.toFixed(2),
             round_off: roundOff.toFixed(2),
             grand_total: grandTotal.toFixed(2),
+            total_amount: subtotal.toFixed(2),
+            discount_amount: discountTotal.toFixed(2),
+            tax_amount: taxTotal.toFixed(2),
+            net_amount: grandTotal.toFixed(2),
+            payment_mode: payment_method || 'CASH',
             paid_amount: Decimal.min(paid, grandTotal).toFixed(2),
             refunded_amount: '0.00',
             balance_due: balanceDue.toFixed(2),

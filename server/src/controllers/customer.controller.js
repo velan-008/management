@@ -33,7 +33,32 @@ export const customerController = {
         offset
       });
 
-      return apiResponse.success(res, { customers: rows }, 'Customers retrieved', 200, {
+      const formattedCustomers = rows.map((c) => {
+        const item = c.toJSON();
+        const limitVal = parseFloat(item.credit_limit || 0);
+        const outstandingVal = parseFloat(item.outstanding_balance || 0);
+        const availCredit = Math.max(0, parseFloat((limitVal - outstandingVal).toFixed(2)));
+
+        let creditStatus = 'OK';
+        if (limitVal <= 0) {
+          creditStatus = 'NO_CREDIT';
+        } else if (outstandingVal >= limitVal) {
+          creditStatus = 'LIMIT_EXCEEDED';
+        } else if (outstandingVal >= limitVal * 0.8) {
+          creditStatus = 'NEAR_LIMIT';
+        }
+
+        return {
+          ...item,
+          customer_type: item.customer_type || 'REGULAR',
+          status: item.status || 'ACTIVE',
+          current_outstanding: outstandingVal,
+          available_credit: availCredit,
+          credit_status: creditStatus
+        };
+      });
+
+      return apiResponse.success(res, { customers: formattedCustomers }, 'Customers retrieved', 200, {
         total: count,
         page: Number(page),
         limit: Number(limit),
@@ -78,7 +103,8 @@ export const customerController = {
         address,
         state,
         tax_number,
-        credit_limit = 0
+        credit_limit = 0,
+        customer_type = 'RETAIL'
       } = req.body;
 
       if (!name || !name.trim()) {
@@ -95,6 +121,12 @@ export const customerController = {
         }
       }
 
+      const normalizedType = customer_type && typeof customer_type === 'string'
+        ? customer_type.trim().toUpperCase()
+        : 'RETAIL';
+      const validTypes = ['RETAIL', 'WHOLESALE', 'REGULAR', 'SUB_WHOLESALER', 'BULK'];
+      const finalCustomerType = validTypes.includes(normalizedType) ? normalizedType : 'RETAIL';
+
       const customer = await Customer.create({
         business_id: req.businessId,
         name: name.trim(),
@@ -104,6 +136,7 @@ export const customerController = {
         state: state ? state.trim() : null,
         tax_number: tax_number ? tax_number.trim() : null,
         credit_limit: parseFloat(credit_limit) || 0,
+        customer_type: finalCustomerType,
         outstanding_balance: 0,
         store_credit: 0
       });
@@ -141,7 +174,8 @@ export const customerController = {
         address,
         state,
         tax_number,
-        credit_limit
+        credit_limit,
+        customer_type
       } = req.body;
 
       // Check phone uniqueness if phone is being changed
@@ -158,7 +192,7 @@ export const customerController = {
         }
       }
 
-      await customer.update({
+      const updateData = {
         name: name !== undefined ? name.trim() : customer.name,
         phone: phone !== undefined ? (phone ? phone.trim() : null) : customer.phone,
         email: email !== undefined ? (email ? email.trim().toLowerCase() : null) : customer.email,
@@ -166,7 +200,15 @@ export const customerController = {
         state: state !== undefined ? (state ? state.trim() : null) : customer.state,
         tax_number: tax_number !== undefined ? (tax_number ? tax_number.trim() : null) : customer.tax_number,
         credit_limit: credit_limit !== undefined ? parseFloat(credit_limit) || 0 : customer.credit_limit
-      });
+      };
+
+      if (customer_type !== undefined) {
+        const norm = typeof customer_type === 'string' ? customer_type.trim().toUpperCase() : 'RETAIL';
+        const valid = ['RETAIL', 'WHOLESALE', 'REGULAR', 'SUB_WHOLESALER', 'BULK'];
+        updateData.customer_type = valid.includes(norm) ? norm : 'RETAIL';
+      }
+
+      await customer.update(updateData);
 
       await AuditLog.create({
         business_id: req.businessId,

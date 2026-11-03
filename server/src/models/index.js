@@ -19,6 +19,11 @@ import { Supplier } from './Supplier.js';
 import { Purchase } from './Purchase.js';
 import { PurchaseItem } from './PurchaseItem.js';
 import { SupplierPayment } from './SupplierPayment.js';
+import { ProductUnit } from './ProductUnit.js';
+import { Inventory } from './Inventory.js';
+import { SubCategory } from './SubCategory.js';
+import { Brand } from './Brand.js';
+import { Unit } from './Unit.js';
 
 // --- Associations ---
 
@@ -194,6 +199,53 @@ SupplierPayment.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' 
 Purchase.hasMany(SupplierPayment, { foreignKey: 'purchase_id', as: 'payments', onDelete: 'SET NULL' });
 SupplierPayment.belongsTo(Purchase, { foreignKey: 'purchase_id', as: 'purchase' });
 
+// Product <-> ProductUnit
+Product.hasMany(ProductUnit, { foreignKey: 'product_id', as: 'units', onDelete: 'CASCADE' });
+ProductUnit.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+
+// Product <-> Inventory (Batches)
+Product.hasMany(Inventory, { foreignKey: 'product_id', as: 'batches', onDelete: 'CASCADE' });
+Inventory.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
+
+// Business <-> Inventory (Batches)
+Business.hasMany(Inventory, { foreignKey: 'business_id', as: 'inventories', onDelete: 'CASCADE' });
+Inventory.belongsTo(Business, { foreignKey: 'business_id', as: 'business' });
+
+// Business <-> SubCategory
+Business.hasMany(SubCategory, { foreignKey: 'business_id', as: 'sub_categories', onDelete: 'CASCADE' });
+SubCategory.belongsTo(Business, { foreignKey: 'business_id', as: 'business' });
+
+// Category <-> SubCategory
+Category.hasMany(SubCategory, { foreignKey: 'category_id', as: 'sub_categories', onDelete: 'CASCADE' });
+SubCategory.belongsTo(Category, { foreignKey: 'category_id', as: 'category' });
+
+// Business <-> Brand
+Business.hasMany(Brand, { foreignKey: 'business_id', as: 'brands', onDelete: 'CASCADE' });
+Brand.belongsTo(Business, { foreignKey: 'business_id', as: 'business' });
+
+// Business <-> Unit
+Business.hasMany(Unit, { foreignKey: 'business_id', as: 'units_master', onDelete: 'CASCADE' });
+Unit.belongsTo(Business, { foreignKey: 'business_id', as: 'business' });
+
+// Product <-> SubCategory
+Product.belongsTo(SubCategory, { foreignKey: 'sub_category_id', as: 'sub_category' });
+Product.belongsTo(SubCategory, { foreignKey: 'sub_category_id', as: 'subCategory' });
+SubCategory.hasMany(Product, { foreignKey: 'sub_category_id', as: 'products', onDelete: 'SET NULL' });
+
+// Product <-> Brand
+Product.belongsTo(Brand, { foreignKey: 'brand_id', as: 'brand_rel' });
+Product.belongsTo(Brand, { foreignKey: 'brand_id', as: 'brandRel' });
+Brand.hasMany(Product, { foreignKey: 'brand_id', as: 'products', onDelete: 'SET NULL' });
+
+// Product <-> Unit
+Product.belongsTo(Unit, { foreignKey: 'unit_id', as: 'unit_rel' });
+Product.belongsTo(Unit, { foreignKey: 'unit_id', as: 'unitRel' });
+Unit.hasMany(Product, { foreignKey: 'unit_id', as: 'products', onDelete: 'SET NULL' });
+
+// Aliases for Invoice semantics
+const Invoice = Sale;
+const InvoiceItem = SaleItem;
+
 export {
   sequelize,
   Business,
@@ -204,6 +256,8 @@ export {
   Customer,
   Sale,
   SaleItem,
+  Invoice,
+  InvoiceItem,
   Payment,
   Refund,
   RefundItem,
@@ -215,5 +269,10 @@ export {
   Supplier,
   Purchase,
   PurchaseItem,
-  SupplierPayment
+  SupplierPayment,
+  ProductUnit,
+  Inventory,
+  SubCategory,
+  Brand,
+  Unit
 };

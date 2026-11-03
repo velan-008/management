@@ -1,4 +1,10 @@
 import '@testing-library/jest-dom';
+import { afterEach } from 'vitest';
+import { cleanup } from '@testing-library/react';
+
+afterEach(() => {
+  cleanup();
+});
 
 // Standard in-memory localStorage mock for Node 22+ / 26+ compatibility
 const localStorageMock = (() => {

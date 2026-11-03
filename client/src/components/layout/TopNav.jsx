@@ -82,9 +82,12 @@ export const TopNav = ({ onOpenMobileMenu }) => {
       icon: Package,
       hasDropdown: true,
       subItems: [
-        { name: 'All Products', to: '/inventory' },
-        { name: 'Categories', to: '/inventory' },
-        { name: 'Stock Movement', to: '/inventory' }
+        { name: 'Products', to: '/inventory?tab=products' },
+        { name: 'Categories', to: '/inventory?tab=categories' },
+        { name: 'Sub-Categories', to: '/inventory?tab=sub-categories' },
+        { name: 'Brands', to: '/inventory?tab=brands' },
+        { name: 'Units', to: '/inventory?tab=units' },
+        { name: 'Movement History', to: '/inventory?tab=history' }
       ]
     },
     { name: 'Purchases', to: '/purchases', icon: Truck },
@@ -130,9 +133,9 @@ export const TopNav = ({ onOpenMobileMenu }) => {
             </div>
             <div className="min-w-0 hidden sm:block">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight leading-none truncate">
+                {/* <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight leading-none truncate">
                   BUSINESSFLOW
-                </span>
+                </span> */}
                 <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                   Wholesale
                 </span>

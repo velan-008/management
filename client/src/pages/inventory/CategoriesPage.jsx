@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Tag, Plus, Edit2, Trash2, Search, AlertCircle, Package } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Tag, Plus, Edit2, Trash2, Search, AlertCircle, Package, Layers, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
 import { Input } from '../../components/ui/Input.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
@@ -28,7 +28,8 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
 
   const [form, setForm] = useState({
     name: '',
-    description: ''
+    description: '',
+    status: 'ACTIVE'
   });
 
   const fetchCategories = useCallback(async () => {
@@ -48,8 +49,8 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
     fetchCategories();
   }, [fetchCategories]);
 
-  const openCreateModal = () => {
-    setForm({ name: '', description: '' });
+  const openCreateModal = (presetName = '') => {
+    setForm({ name: typeof presetName === 'string' ? presetName : '', description: '', status: 'ACTIVE' });
     setFormError('');
     setSelectedCategory(null);
     setModalType('create');
@@ -59,7 +60,8 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
     setSelectedCategory(cat);
     setForm({
       name: cat.name,
-      description: cat.description || ''
+      description: cat.description || '',
+      status: cat.status || 'ACTIVE'
     });
     setFormError('');
     setModalType('edit');
@@ -68,6 +70,21 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
   const openDeleteModal = (cat) => {
     setSelectedCategory(cat);
     setModalType('delete');
+  };
+
+  const toggleStatus = async (cat) => {
+    if (!isAdmin) return;
+    const newStatus = cat.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    try {
+      await categoryService.update(cat.id, {
+        name: cat.name,
+        status: newStatus
+      });
+      toast.success(`Category marked ${newStatus.toLowerCase()}`);
+      fetchCategories();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update category status');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -84,13 +101,15 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
       if (selectedCategory) {
         await categoryService.update(selectedCategory.id, {
           name: form.name.trim(),
-          description: form.description ? form.description.trim() : null
+          description: form.description ? form.description.trim() : null,
+          status: form.status || 'ACTIVE'
         });
         toast.success(`Category "${form.name}" updated successfully.`);
       } else {
         await categoryService.create({
           name: form.name.trim(),
-          description: form.description ? form.description.trim() : null
+          description: form.description ? form.description.trim() : null,
+          status: form.status || 'ACTIVE'
         });
         toast.success(`Category "${form.name}" created successfully.`);
       }
@@ -120,25 +139,35 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
     }
   };
 
-  const filteredCategories = categories.filter((c) => {
-    if (!search.trim()) return true;
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) return categories;
     const term = search.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(term) ||
-      (c.description && c.description.toLowerCase().includes(term))
+    return categories.filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        (c.description && c.description.toLowerCase().includes(term))
     );
-  });
+  }, [categories, search]);
+
+  const totalProductsCount = useMemo(() => {
+    return categories.reduce((sum, c) => sum + (parseInt(c.product_count, 10) || 0), 0);
+  }, [categories]);
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900">
-            Product Categories
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">
+              Product Categories
+            </h2>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+              {categories.length} total
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Organize catalog inventory by departments, tags, and product families.
+            Organize catalog inventory by departments, product families, and FMCG groups.
           </p>
         </div>
 
@@ -149,25 +178,64 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
         )}
       </div>
 
+      {/* Quick Stats Summary Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Categories</p>
+              <p className="text-base font-bold text-slate-900">{categories.length}</p>
+            </div>
+          </div>
+          <span className="text-xs text-slate-400">Active</span>
+        </div>
+
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Package className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Categorized Products</p>
+              <p className="text-base font-bold text-slate-900">{totalProductsCount} items</p>
+            </div>
+          </div>
+          <span className="text-xs text-emerald-600 font-medium">In Catalog</span>
+        </div>
+      </div>
+
       {/* Search Bar */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-subtle flex items-center justify-between gap-3">
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search categories..."
+            placeholder="Search categories by name or description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-colors"
+            className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-2 text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
         <span className="text-xs text-slate-500 font-medium">
-          {filteredCategories.length} categories total
+          Showing {filteredCategories.length} of {categories.length}
         </span>
       </div>
 
       {/* Categories Table */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-card overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
         {loading ? (
           <div className="p-6 space-y-3">
             <Skeleton className="h-10 w-full" />
@@ -208,22 +276,43 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
                 <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Category Name</th>
                   <th className="py-3 px-4">Description</th>
+                  <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-center">Active Products</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredCategories.map((cat) => (
-                  <tr key={cat.id} className="hover:bg-slate-50/60 transition-colors">
+                  <tr key={cat.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-slate-900">
-                      <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span>{cat.name}</span>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                          <Tag className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-900">{cat.name}</span>
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-500 max-w-sm">
-                      {cat.description || <span className="text-slate-300 italic">None</span>}
+                      {cat.description ? (
+                        <span>{cat.description}</span>
+                      ) : (
+                        <span className="text-slate-300 italic">No description provided</span>
+                      )}
+                    </td>
+
+                    <td className="py-3.5 px-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleStatus(cat)}
+                        disabled={!isAdmin}
+                        title={isAdmin ? `Click to ${cat.status === 'ACTIVE' ? 'deactivate' : 'activate'}` : undefined}
+                        className="focus:outline-none"
+                      >
+                        <Badge variant={cat.status === 'ACTIVE' ? 'success' : 'default'} size="sm">
+                          {cat.status || 'ACTIVE'}
+                        </Badge>
+                      </button>
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
@@ -239,25 +328,31 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
+                          icon={Edit2}
                           onClick={() => openEditModal(cat)}
                           title="Edit Category"
-                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                          className="px-2.5 py-1 text-slate-600 hover:text-slate-900"
                         >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
+                          Edit
+                        </Button>
 
                         {isAdmin && (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
+                            icon={Trash2}
                             onClick={() => openDeleteModal(cat)}
                             title="Delete Category"
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="px-2.5 py-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
                           >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                            Delete
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -278,20 +373,25 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {formError && (
-            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium">
-              {formError}
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{formError}</span>
             </div>
           )}
 
-          <Input
-            label="Category Name"
-            name="name"
-            value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="e.g. Computer Accessories, Apparel, Grocery"
-            disabled={isSubmitting}
-            required
-          />
+          <div>
+            <Input
+              label="Category Name"
+              name="name"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g. Biscuits & Cookies, Chocolates, Beverages"
+              disabled={isSubmitting}
+              required
+              autoFocus
+            />
+
+          </div>
 
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
@@ -302,10 +402,22 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
               rows={3}
               value={form.description}
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Short explanation of items falling in this category..."
+              placeholder="Short explanation of items falling in this category (optional)..."
               disabled={isSubmitting}
-              className="w-full text-sm bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-colors resize-none"
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors resize-none"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Status</label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+            >
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
+            </select>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">

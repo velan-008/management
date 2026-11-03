@@ -33,7 +33,10 @@ export const errorHandler = (err, req, res, next) => {
       field: e.path,
       issue: e.message
     }));
-    return apiResponse.error(res, 'Database record validation failed', 400, 'DATABASE_VALIDATION_ERROR', details);
+    const message = details.length
+      ? `Validation failed: ${details.map(d => `${d.field} (${d.issue})`).join(', ')}`
+      : 'Database record validation failed';
+    return apiResponse.error(res, message, 400, 'DATABASE_VALIDATION_ERROR', details);
   }
 
   // Handle JWT Errors

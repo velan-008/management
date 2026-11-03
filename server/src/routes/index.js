@@ -14,6 +14,10 @@ import employeeRoutes from './employee.routes.js';
 import businessRoutes from './business.routes.js';
 import supplierRoutes from './supplier.routes.js';
 import purchaseRoutes from './purchase.routes.js';
+import invoiceRoutes from './invoice.routes.js';
+import subCategoryRoutes from './subCategory.routes.js';
+import brandRoutes from './brand.routes.js';
+import unitRoutes from './unit.routes.js';
 
 const router = Router();
 
@@ -55,6 +59,10 @@ router.use('/employees', employeeRoutes);
 router.use('/businesses', businessRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/purchases', purchaseRoutes);
+router.use('/invoices', invoiceRoutes);
+router.use('/sub-categories', subCategoryRoutes);
+router.use('/brands', brandRoutes);
+router.use('/units', unitRoutes);
 
 // Admin-only test endpoint (for RBAC & privilege verification)
 router.get('/admin/verify-access', authenticate, authorizeRoles('ADMIN'), (req, res) => {

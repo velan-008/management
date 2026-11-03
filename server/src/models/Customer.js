@@ -55,6 +55,33 @@ Customer.init(
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
       defaultValue: 0.00
+    },
+    customer_type: {
+      type: DataTypes.ENUM('RETAIL', 'WHOLESALE', 'REGULAR', 'SUB_WHOLESALER', 'BULK'),
+      allowNull: false,
+      defaultValue: 'RETAIL'
+    },
+    status: {
+      type: DataTypes.ENUM('ACTIVE', 'INACTIVE'),
+      allowNull: false,
+      defaultValue: 'ACTIVE'
+    },
+    current_outstanding: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return this.outstanding_balance;
+      },
+      set(val) {
+        this.setDataValue('outstanding_balance', val);
+      }
+    },
+    available_credit: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        const limit = parseFloat(this.credit_limit || 0);
+        const outstanding = parseFloat(this.outstanding_balance || 0);
+        return Math.max(0, parseFloat((limit - outstanding).toFixed(2)));
+      }
     }
   },
   {

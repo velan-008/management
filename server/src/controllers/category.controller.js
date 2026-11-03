@@ -7,8 +7,18 @@ export const categoryController = {
   list: async (req, res, next) => {
     try {
       const bId = parseInt(req.businessId, 10);
+      const { q, status } = req.query;
+      const where = { business_id: bId };
+
+      if (status) {
+        where.status = status;
+      }
+      if (q && q.trim()) {
+        where.name = { [Op.like]: `%${q.trim()}%` };
+      }
+
       const categories = await Category.findAll({
-        where: { business_id: bId },
+        where,
         attributes: {
           include: [
             [
@@ -50,7 +60,7 @@ export const categoryController = {
   // POST /api/categories
   create: async (req, res, next) => {
     try {
-      const { name, description } = req.body;
+      const { name, description, status = 'ACTIVE' } = req.body;
       if (!name || !name.trim()) {
         return apiResponse.error(res, 'Category name is required', 400, 'VALIDATION_ERROR');
       }
@@ -73,7 +83,8 @@ export const categoryController = {
       const category = await Category.create({
         business_id: req.businessId,
         name: trimmedName,
-        description: description ? description.trim() : null
+        description: description ? description.trim() : null,
+        status: status || 'ACTIVE'
       });
 
       return apiResponse.success(res, { category }, 'Category created successfully', 201);
@@ -93,7 +104,7 @@ export const categoryController = {
         return apiResponse.error(res, 'Category not found', 404, 'NOT_FOUND');
       }
 
-      const { name, description } = req.body;
+      const { name, description, status } = req.body;
 
       if (name && name.trim() !== category.name) {
         const existing = await Category.findOne({
@@ -116,7 +127,8 @@ export const categoryController = {
 
       await category.update({
         name: name !== undefined ? name.trim() : category.name,
-        description: description !== undefined ? (description ? description.trim() : null) : category.description
+        description: description !== undefined ? (description ? description.trim() : null) : category.description,
+        status: status !== undefined ? status : category.status
       });
 
       return apiResponse.success(res, { category }, 'Category updated successfully');
