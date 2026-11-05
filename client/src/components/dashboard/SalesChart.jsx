@@ -24,12 +24,12 @@ export const SalesChart = ({
 
   return (
     <Card
-      className="lg:col-span-2"
+      className="lg:col-span-2 border border-slate-200/90 shadow-subtle hover:border-[#D4AF37]/40 transition-colors"
       title="Sales Performance Trend"
       subtitle={`Daily revenue for the last ${periodDays} days`}
       action={
-        <Badge variant="neutral">
-          <Sparkles className="w-3 h-3 text-indigo-500 mr-1" />
+        <Badge variant="gold">
+          <Sparkles className="w-3 h-3 text-[#D4AF37] mr-1" />
           Live DB Aggregation
         </Badge>
       }
@@ -51,39 +51,39 @@ export const SalesChart = ({
             <AreaChart data={salesTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0F172A" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#0F172A" stopOpacity={0.0} />
+                  <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#D4AF37" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
               <XAxis
                 dataKey="label"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#64748B', fontSize: 11 }}
+                tick={{ fill: '#737373', fontSize: 11 }}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#64748B', fontSize: 11 }}
+                tick={{ fill: '#737373', fontSize: 11 }}
                 tickFormatter={(val) => `${currency}${val}`}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#0F172A',
+                  backgroundColor: '#0B1120',
                   color: '#FFFFFF',
-                  borderRadius: '8px',
+                  borderRadius: '10px',
                   fontSize: '12px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  border: '1px solid rgba(212, 175, 55, 0.4)',
+                  boxShadow: '0 8px 16px -2px rgba(11, 17, 32, 0.25)'
                 }}
                 formatter={(val) => [`${currency}${parseFloat(val).toFixed(2)}`, 'Sales Revenue']}
               />
               <Area
                 type="monotone"
                 dataKey="sales"
-                stroke="#0F172A"
-                strokeWidth={2}
+                stroke="#D4AF37"
+                strokeWidth={2.5}
                 fillOpacity={1}
                 fill="url(#salesGrad)"
               />

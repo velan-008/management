@@ -57,38 +57,38 @@ function ExpenseForm({ expense, onSave, onClose }) {
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Description *</label>
           <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} required
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
             placeholder="e.g., Shop electricity bill, Loading cartons" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Amount *</label>
           <input type="number" step="0.01" min="0.01" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
             placeholder="0.00" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Date</label>
           <input type="date" value={form.expense_date} onChange={e => setForm(f => ({ ...f, expense_date: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Category</label>
           <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white">
             {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Payment Method</label>
           <select value={form.payment_method} onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white">
             {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
           </select>
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Notes</label>
           <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] resize-none"
             placeholder="Optional receipt notes or voucher ref" />
         </div>
       </div>
@@ -202,33 +202,33 @@ export function ExpensesPage() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
             placeholder="Search expenses..." />
         </div>
         <select value={filterCategory} onChange={e => { setFilterCategory(e.target.value); setPage(1); }}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white">
           <option value="">All Categories</option>
           {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]" />
         <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]" />
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-subtle">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Method</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Amount</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+              <tr className="bg-[#0B1120] text-[#D4AF37] border-b-2 border-[#D4AF37]/40">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Method</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Amount</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -245,7 +245,7 @@ export function ExpensesPage() {
                 expenses.map(e => {
                   const status = e.approval_status || 'APPROVED';
                   return (
-                    <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={e.id} className="hover:bg-[#FAF5E8]/40 transition-colors">
                       <td className="px-4 py-3">
                         <p className="font-medium text-slate-900">{e.description}</p>
                         {e.notes && <p className="text-xs text-slate-400 truncate max-w-[200px]">{e.notes}</p>}

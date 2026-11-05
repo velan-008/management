@@ -14,6 +14,7 @@ import {
   productService,
   customerService,
   saleService,
+  invoiceService,
   employeeService,
   expenseService,
   reportService
@@ -37,6 +38,18 @@ vi.mock('../services/businessServices.js', () => ({
     addPayment: vi.fn(),
     refund: vi.fn()
   },
+  invoiceService: {
+    create: vi.fn().mockResolvedValue({
+      data: {
+        invoice: {
+          id: 1,
+          invoice_number: 'INV-2026-0001',
+          items: [],
+          payments: []
+        }
+      }
+    })
+  },
   employeeService: {
     list: vi.fn(),
     create: vi.fn(),
@@ -56,7 +69,9 @@ vi.mock('../services/businessServices.js', () => ({
     getProfitLoss: vi.fn(),
     getSalesSummary: vi.fn(),
     getInventory: vi.fn(),
-    exportCsvUrl: vi.fn()
+    exportCsvUrl: vi.fn(),
+    exportCsv: vi.fn(),
+    downloadCsv: vi.fn().mockResolvedValue(true)
   }
 }));
 
@@ -309,13 +324,33 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
       expect(inputs.some(i => i.value === '960' || i.value === '960.00')).toBe(true);
     });
 
-    // Clearing customer and trying to complete sale should require customer selection
+    // Clearing customer allows completing sale as walk-in customer without requiring customer selection
+    invoiceService.create.mockResolvedValueOnce({
+      data: {
+        invoice: {
+          id: 99,
+          invoice_number: 'INV-WALKIN-001',
+          customer_id: null,
+          grand_total: '960.00',
+          paid_amount: '960.00',
+          payment_mode: 'CASH',
+          items: [],
+          payments: [{ payment_method: 'CASH', amount: '960.00' }]
+        }
+      }
+    });
     fireEvent.click(screen.getByTitle('Clear Customer'));
     fireEvent.click(screen.getByRole('button', { name: /complete sale/i }));
-    expect(await screen.findByText(/please select a customer by name before creating the bill/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(invoiceService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customer_id: null
+        })
+      );
+    });
   });
 
-  it('InvoicesPage: renders invoice ledger and displays items and statuses', async () => {
+  it('InvoicesPage: renders invoice ledger and triggers authenticated CSV export', async () => {
     renderWithProviders(<InvoicesPage />);
 
     expect(await screen.findByText('INV-20260510-0001')).toBeInTheDocument();
@@ -323,6 +358,44 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
     expect(screen.getAllByText(/165\.00/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Paid').length).toBeGreaterThan(0);
     expect(screen.getByText('Completed')).toBeInTheDocument();
+
+    // Trigger CSV export
+    const exportBtn = screen.getByRole('button', { name: /export csv/i });
+    expect(exportBtn).toBeInTheDocument();
+    fireEvent.click(exportBtn);
+    await waitFor(() => {
+      expect(reportService.downloadCsv).toHaveBeenCalledWith('sales', expect.stringContaining('sales-invoices-'));
+    });
+  });
+
+  it('InvoicesPage: opens Invoice Details modal and displays structured invoice with print support', async () => {
+    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+    const { unmount } = renderWithProviders(<InvoicesPage />);
+
+    expect(await screen.findByText('INV-20260510-0001')).toBeInTheDocument();
+
+    // Click the View (Eye) button
+    const viewButtons = screen.getAllByRole('button');
+    const eyeBtn = viewButtons.find(b => b.querySelector('svg.lucide-eye'));
+    expect(eyeBtn).toBeDefined();
+    fireEvent.click(eyeBtn);
+
+    // Modal opens and shows professional invoice details
+    expect(await screen.findByText('Laser Barcode Scanner')).toBeInTheDocument();
+    expect(screen.getByText('SKU-SCAN-01')).toBeInTheDocument();
+    expect(screen.getAllByText('Cyberdyne Systems').length).toBeGreaterThan(1);
+    expect(screen.getByText('A4 Tax Invoice')).toBeInTheDocument();
+    expect(screen.getByText('Print Invoice')).toBeInTheDocument();
+
+    // Click Print button
+    fireEvent.click(screen.getByText('Print Invoice'));
+    await waitFor(() => {
+      expect(printSpy).toHaveBeenCalled();
+    });
+    document.getElementById('invoice-print-direct-container')?.remove();
+    document.getElementById('print-page-style')?.remove();
+    unmount();
+    printSpy.mockRestore();
   });
 
   it('CustomersPage: lists customers and opens create modal', async () => {
@@ -363,7 +436,7 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
   });
 
   it('EmployeesPage: opens View Employee Details modal', async () => {
-    renderWithProviders(<EmployeesPage />);
+    const { unmount } = renderWithProviders(<EmployeesPage />);
 
     expect(await screen.findByText('John Connor')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /view/i }));
@@ -371,18 +444,20 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
     expect(await screen.findByText('Employee Details')).toBeInTheDocument();
     expect(screen.getAllByText('Store Manager').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Operations').length).toBeGreaterThan(0);
+    unmount();
   });
 
   it('EmployeesPage: opens Edit Employee Details modal', async () => {
-    renderWithProviders(<EmployeesPage />);
+    const { unmount } = renderWithProviders(<EmployeesPage />);
 
     expect(await screen.findByText('John Connor')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /edit/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
 
     expect(await screen.findByText('Edit Employee Details')).toBeInTheDocument();
     expect(screen.getByDisplayValue('John Connor')).toBeInTheDocument();
     // Must NOT have password inputs
     expect(screen.queryByPlaceholderText(/login password/i)).not.toBeInTheDocument();
+    unmount();
   });
 
   it('EmployeesPage: confirms employee deactivation', async () => {
@@ -411,7 +486,7 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
     expect(screen.getAllByText('Utilities').length).toBeGreaterThan(0);
   });
 
-  it('ReportsPage: renders KPI cards and CSV export buttons', async () => {
+  it('ReportsPage: renders KPI cards and CSV export buttons and triggers exports', async () => {
     renderWithProviders(<ReportsPage />);
 
     expect(await screen.findByText('Total Revenue')).toBeInTheDocument();
@@ -419,5 +494,17 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
     expect(screen.getByText('Total Expenses')).toBeInTheDocument();
     expect(screen.getByText('Export Sales CSV')).toBeInTheDocument();
     expect(screen.getByText('Export Inventory CSV')).toBeInTheDocument();
+
+    // Trigger Sales Export
+    fireEvent.click(screen.getByRole('button', { name: /export sales csv/i }));
+    await waitFor(() => {
+      expect(reportService.downloadCsv).toHaveBeenCalledWith('sales', expect.stringContaining('sales-report-'));
+    });
+
+    // Trigger Inventory Export
+    fireEvent.click(screen.getByRole('button', { name: /export inventory csv/i }));
+    await waitFor(() => {
+      expect(reportService.downloadCsv).toHaveBeenCalledWith('products', expect.stringContaining('products-report-'));
+    });
   });
 });

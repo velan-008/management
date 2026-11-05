@@ -6,8 +6,10 @@ import {
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { Modal } from '../../components/ui/Modal.jsx';
-import { saleService } from '../../services/businessServices.js';
+import { saleService, reportService } from '../../services/businessServices.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useNotification } from '../../context/NotificationContext.jsx';
+import { InvoiceDocument } from '../../components/invoice/InvoiceDocument.jsx';
 
 const STATUS_CONFIG = {
   COMPLETED: { label: 'Completed', variant: 'success', icon: CheckCircle },
@@ -24,9 +26,10 @@ const PAY_STATUS_CONFIG = {
 
 function SaleDetailModal({ saleId, onClose, onPayment, onRefund }) {
   const { business, isAdmin } = useAuth();
-  const currency = business?.currency_symbol || '$';
+  const currency = (business?.currency_symbol && business.currency_symbol !== '$') ? business.currency_symbol : '₹';
   const [sale, setSale] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [printLayout, setPrintLayout] = useState('a4'); // 'a4' | 'thermal'
   const [payForm, setPayForm] = useState({ amount: '', method: 'CASH' });
   const [payLoading, setPayLoading] = useState(false);
   const [showPayForm, setShowPayForm] = useState(false);
@@ -91,166 +94,198 @@ function SaleDetailModal({ saleId, onClose, onPayment, onRefund }) {
   };
 
   const handlePrint = () => {
-    window.print();
+    const invoiceEl = document.getElementById('sales-invoice-print-area');
+    if (!invoiceEl) return;
+
+    // 1. Clean up any previous direct print container
+    let directContainer = document.getElementById('invoice-print-direct-container');
+    if (directContainer) {
+      directContainer.remove();
+    }
+
+    // 2. Create dedicated direct print container mounted directly on document.body
+    directContainer = document.createElement('div');
+    directContainer.id = 'invoice-print-direct-container';
+    directContainer.appendChild(invoiceEl.cloneNode(true));
+    document.body.appendChild(directContainer);
+
+    // 3. Inject print styles with dynamic @page sizing and strict isolation
+    let style = document.getElementById('print-page-style');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'print-page-style';
+      document.head.appendChild(style);
+    }
+
+    const isThermal = printLayout === 'thermal';
+    const pageRule = isThermal
+      ? '@page { size: 80mm auto; margin: 0; }'
+      : '@page { size: A4 portrait; margin: 8mm; }';
+
+    style.innerHTML = `
+      ${pageRule}
+
+      /* Screen: Never display the direct print container on screen */
+      @media screen {
+        #invoice-print-direct-container {
+          display: none !important;
+        }
+      }
+
+      /* Print: Strictly hide EVERYTHING except the dedicated direct print container */
+      @media print {
+        html, body {
+          height: auto !important;
+          min-height: 0 !important;
+          overflow: visible !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+        }
+
+        /* HIDE the entire application tree, modal, backdrop, headers, dashboard */
+        body > *:not(#invoice-print-direct-container) {
+          display: none !important;
+        }
+
+        /* SHOW ONLY the dedicated invoice container */
+        #invoice-print-direct-container {
+          display: block !important;
+          position: static !important;
+          margin: 0 auto !important;
+          padding: 0 !important;
+          background: #ffffff !important;
+          width: ${isThermal ? '72mm' : '100%'} !important;
+          max-width: ${isThermal ? '72mm' : '190mm'} !important;
+        }
+
+        #invoice-print-direct-container #sales-invoice-print-area,
+        #invoice-print-direct-container #invoice-print-area {
+          display: block !important;
+          position: static !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          margin: 0 auto !important;
+          padding: ${isThermal ? '2mm 0' : '0'} !important;
+          border: none !important;
+          box-shadow: none !important;
+          background: #ffffff !important;
+        }
+
+        #invoice-print-direct-container table {
+          width: 100% !important;
+          table-layout: fixed !important;
+        }
+
+        #invoice-print-direct-container tr {
+          page-break-inside: avoid !important;
+        }
+
+        .print-thermal {
+          width: 72mm !important;
+          max-width: 72mm !important;
+          font-size: 11px !important;
+          margin: 0 auto !important;
+        }
+
+        .print-a4 {
+          width: 190mm !important;
+          max-width: 190mm !important;
+          font-size: 12px !important;
+          margin: 0 auto !important;
+        }
+
+        .no-print {
+          display: none !important;
+        }
+      }
+    `;
+
+    // 4. Cleanup function after print dialog closes or cancels
+    const cleanup = () => {
+      const container = document.getElementById('invoice-print-direct-container');
+      if (container) container.remove();
+      const s = document.getElementById('print-page-style');
+      if (s) s.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+
+    window.addEventListener('afterprint', cleanup);
+
+    // 5. Brief timeout to allow browser layout to stabilize before opening print preview
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
-  if (loading) return <div className="py-10 text-center text-slate-400">Loading invoice details...</div>;
+  if (loading) return <div className="py-12 text-center text-slate-400 font-medium">Loading invoice details...</div>;
   if (!sale) return null;
 
   const ps = PAY_STATUS_CONFIG[sale.payment_status] || PAY_STATUS_CONFIG.UNPAID;
   const ss = STATUS_CONFIG[sale.status] || STATUS_CONFIG.COMPLETED;
 
   return (
-    <div className="space-y-5 print:p-0">
-      {/* Invoice Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div>
-          <p className="text-xs text-slate-400">Invoice Number</p>
-          <p className="text-lg font-bold text-slate-900 font-mono">{sale.invoice_number}</p>
-        </div>
+    <div className="space-y-4">
+      {/* 1. Modal Top Action Header (no-print) */}
+      <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
           <Badge variant={ss.variant}>{ss.label}</Badge>
           <Badge variant={ps.variant}>{ps.label}</Badge>
-          <button
-            type="button"
+          <span className="text-xs text-slate-500 font-mono">
+            {sale.invoice_date}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Format selector: A4 Tax Invoice / 80mm Thermal */}
+          <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-100 text-xs">
+            <button
+              type="button"
+              onClick={() => setPrintLayout('a4')}
+              className={`px-2.5 py-1 font-semibold rounded-md transition-colors ${
+                printLayout === 'a4'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              A4 Tax Invoice
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintLayout('thermal')}
+              className={`px-2.5 py-1 font-semibold rounded-md transition-colors ${
+                printLayout === 'thermal'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              80mm Thermal
+            </button>
+          </div>
+
+          <Button
+            variant="primary"
+            icon={Printer}
+            size="sm"
             onClick={handlePrint}
-            title="Print Invoice"
-            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors ml-2"
+            className="shadow-sm"
           >
-            <Printer className="w-4 h-4" />
-          </button>
+            Print Invoice
+          </Button>
         </div>
       </div>
 
-      {/* Business & Customer Info */}
-      <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
-        <div>
-          <p className="font-semibold text-slate-800">{business?.name || 'BUSINESSFLOW Store'}</p>
-          <p className="text-slate-500">{business?.address || 'Tax Invoice'}</p>
-          {business?.tax_number && (
-            <p className="text-slate-600 font-mono mt-0.5">GSTIN/Tax ID: {business.tax_number}</p>
-          )}
-        </div>
-        <div className="text-right">
-          <p className="text-slate-400">Billed To:</p>
-          <p className="font-semibold text-slate-800">{sale.customer?.name || 'Walk-in Customer'}</p>
-          {sale.customer?.phone && <p className="text-slate-500">Phone: {sale.customer.phone}</p>}
-          {sale.customer?.tax_number && <p className="text-slate-500 font-mono">Tax ID: {sale.customer.tax_number}</p>}
-          <p className="text-slate-400 mt-1">Invoice Date: {sale.invoice_date}</p>
+      {/* 2. Structured Professional Invoice Document Preview */}
+      <div className="receipt-preview-container max-h-[65vh] overflow-y-auto p-4 bg-slate-100/90 rounded-xl flex justify-center border border-slate-200 shadow-inner">
+        <div id="sales-invoice-print-area">
+          <InvoiceDocument
+            invoice={sale}
+            printLayout={printLayout}
+            business={business}
+            currency={currency}
+          />
         </div>
       </div>
-
-      {/* Items Table */}
-      <div className="border border-slate-100 rounded-lg overflow-hidden">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              <th className="px-3 py-2 text-left font-semibold text-slate-500">Item</th>
-              <th className="px-3 py-2 text-center font-semibold text-slate-500">Qty</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-500">Price</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-500">Tax</th>
-              <th className="px-3 py-2 text-right font-semibold text-slate-500">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {(sale.items || []).map((item) => {
-              const unitPrice = parseFloat(item.unit_selling_price || item.unit_price || 0);
-              const maxRefundable = item.quantity - (item.refunded_quantity || 0);
-
-              return (
-                <tr key={item.id}>
-                  <td className="px-3 py-2">
-                    <p className="font-medium text-slate-800">{item.product_name}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">{item.product_sku}</p>
-                    {item.refunded_quantity > 0 && (
-                      <p className="text-rose-600 text-[10px] font-medium">
-                        Refunded: {item.refunded_quantity} pcs
-                      </p>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-center text-slate-600">{item.quantity}</td>
-                  <td className="px-3 py-2 text-right text-slate-600 font-mono">
-                    {currency}{unitPrice.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2 text-right text-slate-500 font-mono">
-                    {parseFloat(item.tax_rate || 0)}%
-                  </td>
-                  <td className="px-3 py-2 text-right font-semibold font-mono text-slate-900">
-                    {currency}{parseFloat(item.line_total).toFixed(2)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Totals & Tax Breakdown */}
-      <div className="space-y-1.5 text-xs bg-white p-3 border border-slate-100 rounded-lg">
-        <div className="flex justify-between text-slate-500">
-          <span>Subtotal</span>
-          <span className="font-mono">{currency}{parseFloat(sale.subtotal).toFixed(2)}</span>
-        </div>
-        {parseFloat(sale.discount_total) > 0 && (
-          <div className="flex justify-between text-emerald-600">
-            <span>Discounts</span>
-            <span className="font-mono">−{currency}{parseFloat(sale.discount_total).toFixed(2)}</span>
-          </div>
-        )}
-        {parseFloat(sale.cgst_total) > 0 && (
-          <div className="flex justify-between text-slate-500 text-[11px]">
-            <span>CGST</span>
-            <span className="font-mono">{currency}{parseFloat(sale.cgst_total).toFixed(2)}</span>
-          </div>
-        )}
-        {parseFloat(sale.sgst_total) > 0 && (
-          <div className="flex justify-between text-slate-500 text-[11px]">
-            <span>SGST</span>
-            <span className="font-mono">{currency}{parseFloat(sale.sgst_total).toFixed(2)}</span>
-          </div>
-        )}
-        {parseFloat(sale.igst_total) > 0 && (
-          <div className="flex justify-between text-slate-500 text-[11px]">
-            <span>IGST</span>
-            <span className="font-mono">{currency}{parseFloat(sale.igst_total).toFixed(2)}</span>
-          </div>
-        )}
-        <div className="flex justify-between font-bold text-slate-900 text-sm border-t border-slate-100 pt-2">
-          <span>Grand Total</span>
-          <span className="font-mono">{currency}{parseFloat(sale.grand_total).toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-emerald-600">
-          <span>Paid</span>
-          <span className="font-mono">{currency}{parseFloat(sale.paid_amount).toFixed(2)}</span>
-        </div>
-        {parseFloat(sale.balance_due) > 0 && (
-          <div className="flex justify-between text-amber-600 font-medium">
-            <span>Balance Due</span>
-            <span className="font-mono">{currency}{parseFloat(sale.balance_due).toFixed(2)}</span>
-          </div>
-        )}
-        {parseFloat(sale.refunded_amount) > 0 && (
-          <div className="flex justify-between text-rose-500">
-            <span>Refunded</span>
-            <span className="font-mono">−{currency}{parseFloat(sale.refunded_amount).toFixed(2)}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Payments Log */}
-      {sale.payments?.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase mb-1.5">Payment History</p>
-          <div className="space-y-1">
-            {sale.payments.map((p) => (
-              <div key={p.id} className="flex justify-between text-xs text-slate-600 bg-slate-50 px-2.5 py-1.5 rounded">
-                <span>{p.payment_method} · {new Date(p.payment_date || p.created_at).toLocaleDateString()}</span>
-                <span className="font-mono font-medium">{currency}{parseFloat(p.amount).toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Payment Action */}
       {sale.payment_status !== 'PAID' && (
@@ -271,7 +306,7 @@ function SaleDetailModal({ saleId, onClose, onPayment, onRefund }) {
                   required
                   value={payForm.amount}
                   onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
-                  className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-slate-900"
+                  className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none bg-white"
                   placeholder={`Amount (max ${sale.balance_due})`}
                 />
                 <select
@@ -393,6 +428,25 @@ export function InvoicesPage() {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, totalPages: 1 });
   const [selectedSaleId, setSelectedSaleId] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const { toast } = useNotification() || {};
+
+  const handleExportCsv = async () => {
+    if (exporting) return;
+    try {
+      setExporting(true);
+      await reportService.downloadCsv('sales', `sales-invoices-${Date.now()}.csv`);
+      if (toast?.success) {
+        toast.success('Sales CSV exported successfully');
+      }
+    } catch (err) {
+      if (toast?.error) {
+        toast.error(err.message || 'Failed to export sales CSV');
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const fetchSales = useCallback(async () => {
     setLoading(true);
@@ -425,14 +479,14 @@ export function InvoicesPage() {
           <h1 className="text-xl font-bold text-slate-900">Sales & Invoices</h1>
           <p className="text-sm text-slate-500 mt-0.5">{meta.total} invoices total</p>
         </div>
-        <a
-          href="/api/reports/export/sales"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-subtle"
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-subtle disabled:opacity-60 cursor-pointer"
         >
-          Export CSV
-        </a>
+          {exporting ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
 
       {/* Filters */}
@@ -445,7 +499,7 @@ export function InvoicesPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
             placeholder="Search invoice number..."
           />
         </div>
@@ -455,7 +509,7 @@ export function InvoicesPage() {
             setFilterPayStatus(e.target.value);
             setPage(1);
           }}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white cursor-pointer"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white cursor-pointer"
         >
           <option value="">All Payment Status</option>
           <option value="PAID">Paid</option>
@@ -469,7 +523,7 @@ export function InvoicesPage() {
             setDateFrom(e.target.value);
             setPage(1);
           }}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
         />
         <input
           type="date"
@@ -478,7 +532,7 @@ export function InvoicesPage() {
             setDateTo(e.target.value);
             setPage(1);
           }}
-          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
         />
       </div>
 
@@ -487,16 +541,16 @@ export function InvoicesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Invoice</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Total</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Balance</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Payment</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider"></th>
+              <tr className="bg-[#0B1120] text-[#D4AF37] border-b-2 border-[#D4AF37]/40">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Invoice</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Customer</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Total</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Paid</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Balance</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Payment</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -573,7 +627,7 @@ export function InvoicesPage() {
         )}
       </div>
 
-      <Modal isOpen={!!selectedSaleId} onClose={() => setSelectedSaleId(null)} title="Invoice Details" size="lg">
+      <Modal isOpen={!!selectedSaleId} onClose={() => setSelectedSaleId(null)} title="Invoice Details" size="xl">
         {selectedSaleId && (
           <SaleDetailModal
             saleId={selectedSaleId}

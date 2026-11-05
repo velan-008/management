@@ -7,13 +7,13 @@ export const NotFoundPage = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mb-4">
+    <div className="min-h-screen bg-[#F8F8F8] flex flex-col items-center justify-center p-6 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-[#FAF5E8] border border-[#D4AF37]/40 flex items-center justify-center text-[#D4AF37] mb-4 shadow-sm">
         <FileQuestion className="w-8 h-8" />
       </div>
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900">404 — Page Not Found</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1120]">404 — Page Not Found</h1>
       <p className="text-xs text-slate-500 max-w-sm mt-1 mb-6 leading-relaxed">
-        The page you are looking for does not exist or has been moved to another location.
+        The wholesale page or module you are looking for does not exist or has moved.
       </p>
       <Button
         variant="primary"

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
-import { Building2, Mail, Lock, User, MapPin, DollarSign, AlertCircle, ArrowRight } from 'lucide-react';
+import { Building2, Mail, Lock, User, MapPin, DollarSign, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { Input } from '../../components/ui/Input.jsx';
 import { Button } from '../../components/ui/Button.jsx';
@@ -73,151 +73,161 @@ export const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#F8F8F8] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
       {/* Brand Header */}
       <div className="mb-6 text-center">
-        <div className="inline-flex w-10 h-10 rounded-xl bg-slate-900 text-white items-center justify-center font-bold text-base shadow-sm mb-3">
+        <div className="inline-flex w-12 h-12 rounded-2xl bg-gradient-to-br from-[#D4AF37] to-[#B89326] text-[#0B1120] items-center justify-center font-extrabold text-lg shadow-gold mb-3 border border-[#D4AF37]/40">
           BF
         </div>
-        <h1 className="text-xl font-bold tracking-tight text-slate-900">
+        <h1 className="text-2xl font-extrabold tracking-tight text-[#0B1120]">
           Create your BUSINESSFLOW account
         </h1>
-        <p className="text-xs text-slate-500 mt-1 max-w-sm">
-          Set up your organization, admin credentials, and currency in seconds.
+        <p className="text-xs text-[#6E5513] mt-1 font-medium max-w-sm">
+          Set up your wholesale organization, master registers, and administrator access.
         </p>
       </div>
 
       {/* Main Register Card */}
-      <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-2xl shadow-card p-6 sm:p-7">
-        {formError && (
-          <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-            <div className="font-medium leading-relaxed">{formError}</div>
-          </div>
-        )}
+      <div className="w-full max-w-md bg-white border border-[#D4AF37]/30 rounded-2xl shadow-popup overflow-hidden">
+        {/* Top Gold Accent Bar */}
+        <div className="h-1.5 bg-gradient-to-r from-[#D4AF37] via-[#F4E7C4] to-[#D4AF37]" />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="p-6 sm:p-7">
+          {formError && (
+            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="font-medium leading-relaxed">{formError}</div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Organization Name"
+                id="businessName"
+                name="businessName"
+                placeholder="Apex Retail Corp"
+                value={form.businessName}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                icon={Building2}
+                required
+              />
+
+              <Input
+                label="Business Contact Email"
+                id="businessEmail"
+                name="businessEmail"
+                type="email"
+                placeholder="contact@apexretail.com"
+                value={form.businessEmail}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                icon={Mail}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Admin Full Name"
+                id="name"
+                name="name"
+                placeholder="Sarah Connor"
+                value={form.name}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                icon={User}
+                required
+              />
+
+              <Input
+                label="Admin Login Email"
+                id="email"
+                name="email"
+                type="email"
+                placeholder="admin@apexretail.com"
+                value={form.email}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                icon={Mail}
+                required
+              />
+            </div>
+
             <Input
-              label="Organization Name"
-              id="businessName"
-              name="businessName"
-              placeholder="Apex Retail Corp"
-              value={form.businessName}
+              label="Password (min 8 chars, 1 uppercase, 1 digit)"
+              id="password"
+              name="password"
+              type="password"
+              placeholder="••••••••••••"
+              value={form.password}
               onChange={handleChange}
               disabled={isSubmitting}
-              icon={Building2}
+              icon={Lock}
               required
             />
 
-            <Input
-              label="Business Contact Email"
-              id="businessEmail"
-              name="businessEmail"
-              type="email"
-              placeholder="contact@apexretail.com"
-              value={form.businessEmail}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              icon={Mail}
-              required
-            />
+            <div className="grid grid-cols-3 gap-2">
+              <Input
+                label="State / Region"
+                id="state"
+                name="state"
+                placeholder="California"
+                value={form.state}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                icon={MapPin}
+              />
+
+              <Input
+                label="Currency Code"
+                id="currencyCode"
+                name="currencyCode"
+                placeholder="USD"
+                value={form.currencyCode}
+                onChange={handleChange}
+                disabled={isSubmitting}
+              />
+
+              <Input
+                label="Symbol"
+                id="currencySymbol"
+                name="currencySymbol"
+                placeholder="$"
+                value={form.currencySymbol}
+                onChange={handleChange}
+                disabled={isSubmitting}
+                icon={DollarSign}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              className="w-full mt-2 bg-[#0B1120] text-[#D4AF37] hover:bg-[#162038] hover:text-white border border-[#D4AF37]/40 py-2.5 font-bold"
+              isLoading={isSubmitting}
+            >
+              <span>Register Organization</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </Button>
+          </form>
+
+          <div className="mt-5 pt-4 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-500">
+              Already have an account?{' '}
+              <Link to="/login" className="font-bold text-[#0B1120] hover:text-[#D4AF37] transition-colors underline">
+                Sign in
+              </Link>
+            </p>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
-              label="Admin Full Name"
-              id="name"
-              name="name"
-              placeholder="Sarah Connor"
-              value={form.name}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              icon={User}
-              required
-            />
-
-            <Input
-              label="Admin Login Email"
-              id="email"
-              name="email"
-              type="email"
-              placeholder="admin@apexretail.com"
-              value={form.email}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              icon={Mail}
-              required
-            />
-          </div>
-
-          <Input
-            label="Password (min 8 chars, 1 uppercase, 1 digit)"
-            id="password"
-            name="password"
-            type="password"
-            placeholder="••••••••••••"
-            value={form.password}
-            onChange={handleChange}
-            disabled={isSubmitting}
-            icon={Lock}
-            required
-          />
-
-          <div className="grid grid-cols-3 gap-2">
-            <Input
-              label="State / Region"
-              id="state"
-              name="state"
-              placeholder="California"
-              value={form.state}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              icon={MapPin}
-            />
-
-            <Input
-              label="Currency Code"
-              id="currencyCode"
-              name="currencyCode"
-              placeholder="USD"
-              value={form.currencyCode}
-              onChange={handleChange}
-              disabled={isSubmitting}
-            />
-
-            <Input
-              label="Symbol"
-              id="currencySymbol"
-              name="currencySymbol"
-              placeholder="$"
-              value={form.currencySymbol}
-              onChange={handleChange}
-              disabled={isSubmitting}
-              icon={DollarSign}
-            />
-          </div>
-
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            className="w-full mt-2"
-            isLoading={isSubmitting}
-          >
-            <span>Register Organization</span>
-            <ArrowRight className="w-4 h-4 ml-1" />
-          </Button>
-        </form>
-
-        <div className="mt-5 pt-4 border-t border-slate-100 text-center">
-          <p className="text-xs text-slate-500">
-            Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-slate-900 hover:underline">
-              Sign in
-            </Link>
-          </p>
         </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-6 text-center">
+        <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+        <span>Enterprise Multi-Tenant Data Isolation Enabled</span>
       </div>
     </div>
   );

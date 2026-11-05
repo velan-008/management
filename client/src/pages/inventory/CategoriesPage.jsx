@@ -180,9 +180,9 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
 
       {/* Quick Stats Summary Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-between">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-[#FAF5E8] text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center shrink-0">
               <Layers className="w-5 h-5" />
             </div>
             <div>
@@ -216,7 +216,7 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
             placeholder="Search categories by name or description..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-2 text-slate-800 placeholder-slate-400 focus:bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
+            className="w-full text-xs bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-8 py-2 text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-colors"
           />
           {search && (
             <button
@@ -273,7 +273,7 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                <tr className="border-b-2 border-[#D4AF37]/40 bg-[#0B1120] text-[#D4AF37] font-semibold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Category Name</th>
                   <th className="py-3 px-4">Description</th>
                   <th className="py-3 px-4 text-center">Status</th>
@@ -283,10 +283,10 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredCategories.map((cat) => (
-                  <tr key={cat.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr key={cat.id} className="hover:bg-[#FAF5E8]/40 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-slate-900">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-[#FAF5E8] text-[#D4AF37] border border-[#D4AF37]/30 flex items-center justify-center shrink-0">
                           <Tag className="w-3.5 h-3.5" />
                         </div>
                         <span className="text-sm font-bold text-slate-900">{cat.name}</span>
@@ -404,7 +404,7 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
               onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
               placeholder="Short explanation of items falling in this category (optional)..."
               disabled={isSubmitting}
-              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors resize-none"
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] focus:outline-none transition-colors resize-none"
             />
           </div>
 
@@ -413,7 +413,7 @@ export function CategoriesPage({ onFilterProductsByCategory }) {
             <select
               value={form.status}
               onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
             >
               <option value="ACTIVE">ACTIVE</option>
               <option value="INACTIVE">INACTIVE</option>

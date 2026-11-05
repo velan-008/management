@@ -566,7 +566,7 @@ export function ProductsPage({ onNavigateToHistory }) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                <tr className="border-b-2 border-[#D4AF37]/40 bg-[#0B1120] text-[#D4AF37] font-semibold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Item Details</th>
                   <th className="py-3 px-4">SKU / Barcode</th>
                   <th className="py-3 px-4">Category & Sub-Category</th>
@@ -584,7 +584,7 @@ export function ProductsPage({ onNavigateToHistory }) {
                   const isOut = p.quantity <= 0;
 
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={p.id} className="hover:bg-[#FAF5E8]/40 transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
                           {p.image_url ? (
@@ -697,7 +697,7 @@ export function ProductsPage({ onNavigateToHistory }) {
                             type="button"
                             onClick={() => openAdjustModal(p)}
                             title="Adjust Stock"
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-[#0B1120] hover:bg-[#FAF5E8] rounded-lg transition-colors"
                           >
                             <ArrowUpDown className="w-4 h-4" />
                           </button>
@@ -759,7 +759,7 @@ export function ProductsPage({ onNavigateToHistory }) {
           <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Package className="w-4 h-4 text-indigo-600" /> 1. Basic Information
+                <Package className="w-4 h-4 text-[#D4AF37]" /> 1. Basic Information
               </h3>
               <span className="text-[11px] text-slate-400">* Required fields</span>
             </div>
@@ -788,7 +788,7 @@ export function ProductsPage({ onNavigateToHistory }) {
                       const rand = Math.floor(100000 + Math.random() * 900000);
                       setForm(prev => ({ ...prev, sku: `${prefix}-${rand}` }));
                     }}
-                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold"
+                    className="text-[10px] text-[#D4AF37] hover:text-[#B89326] font-semibold"
                   >
                     Auto Generate
                   </button>
@@ -841,7 +841,7 @@ export function ProductsPage({ onNavigateToHistory }) {
                   value={form.brand_id}
                   onChange={handleBrandChange}
                   disabled={isSubmitting}
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] focus:outline-none transition-colors"
                 >
                   <option value="">-- Select Brand --</option>
                   {brands.map((b) => (
@@ -954,7 +954,7 @@ export function ProductsPage({ onNavigateToHistory }) {
           <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <SlidersHorizontal className="w-4 h-4 text-purple-600" /> 3. Stock, Packaging & Batch
+                <SlidersHorizontal className="w-4 h-4 text-[#D4AF37]" /> 3. Stock, Packaging & Batch
               </h3>
             </div>
 
@@ -965,7 +965,7 @@ export function ProductsPage({ onNavigateToHistory }) {
                   value={form.unit_id || ''}
                   onChange={handleUnitChange}
                   disabled={isSubmitting}
-                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
+                  className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] focus:outline-none transition-colors"
                 >
                   <option value="">Select Unit</option>
                   {units.map((u) => (
@@ -1059,7 +1059,7 @@ export function ProductsPage({ onNavigateToHistory }) {
               onChange={handleFormChange}
               placeholder="Flavor, variant, weight, packaging details..."
               disabled={isSubmitting}
-              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors resize-none"
+              className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-900 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] focus:outline-none transition-colors resize-none"
             />
           </div>
 
@@ -1107,7 +1107,7 @@ export function ProductsPage({ onNavigateToHistory }) {
                   className={`font-mono text-base font-bold mt-0.5 ${
                     (selectedProduct?.quantity || 0) + parseInt(adjustForm.quantity_change, 10) < 0
                       ? 'text-rose-600'
-                      : 'text-indigo-600'
+                      : 'text-[#D4AF37]'
                   }`}
                 >
                   {(selectedProduct?.quantity || 0) + parseInt(adjustForm.quantity_change, 10)} {selectedProduct?.unit}
@@ -1253,7 +1253,7 @@ export function ProductsPage({ onNavigateToHistory }) {
               {selectedProduct.wholesale_price && (
                 <div>
                   <span className="text-slate-400">Wholesale Price</span>
-                  <p className="font-mono font-bold text-indigo-600 mt-0.5">{formatCurrency(selectedProduct.wholesale_price)}</p>
+                  <p className="font-mono font-bold text-[#0B1120] mt-0.5">{formatCurrency(selectedProduct.wholesale_price)}</p>
                 </div>
               )}
               {selectedProduct.batch_number && (

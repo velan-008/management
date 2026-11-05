@@ -117,5 +117,33 @@ export const reportService = {
   getProfitLoss: (params) => api.get('/reports/profit-loss', { params }),
   getSalesSummary: (params) => api.get('/reports/sales-summary', { params }),
   getInventory: () => api.get('/reports/inventory'),
-  exportCsvUrl: (type) => `/api/reports/export/${type}`
+  exportCsvUrl: (type) => `/api/reports/export/${type}`,
+  exportCsv: async (type) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token required. Please log in again.');
+    }
+    return api.get(`/reports/export/${type}`, {
+      responseType: 'blob'
+    });
+  },
+  downloadCsv: async (type, filename) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Authentication token required. Please log in again.');
+    }
+    const data = await api.get(`/reports/export/${type}`, {
+      responseType: 'blob'
+    });
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename || `export-${type}-${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    return true;
+  }
 };

@@ -185,7 +185,7 @@ export function BrandsPage({ onFilterProductsByBrand }) {
           placeholder="Search brands..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all shadow-xs"
+          className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:border-transparent transition-all shadow-xs"
         />
       </div>
 
@@ -226,7 +226,7 @@ export function BrandsPage({ onFilterProductsByBrand }) {
             return (
               <div
                 key={item.id}
-                className="bg-white rounded-xl border border-slate-200 hover:border-slate-300 p-4 flex flex-col justify-between transition-all hover:shadow-sm"
+                className="bg-white rounded-xl border border-slate-200/90 hover:border-[#D4AF37]/50 p-4 flex flex-col justify-between transition-all shadow-subtle hover:shadow-gold"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
@@ -332,7 +332,7 @@ export function BrandsPage({ onFilterProductsByBrand }) {
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={2}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] resize-none"
               />
             </div>
 
@@ -341,7 +341,7 @@ export function BrandsPage({ onFilterProductsByBrand }) {
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
               >
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="INACTIVE">INACTIVE</option>

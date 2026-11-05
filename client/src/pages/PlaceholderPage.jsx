@@ -8,17 +8,17 @@ export const PlaceholderPage = ({ title, stage, description }) => {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900">{title}</h2>
-          <Badge variant="info">Stage {stage}</Badge>
+          <h2 className="text-xl font-bold tracking-tight text-[#0B1120]">{title}</h2>
+          <Badge variant="gold">Stage {stage}</Badge>
         </div>
         <p className="text-xs text-slate-500">{description}</p>
       </div>
 
       <Card bodyClassName="p-12 text-center flex flex-col items-center justify-center">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
+        <div className="w-12 h-12 rounded-2xl bg-[#FAF5E8] border border-[#D4AF37]/30 text-[#D4AF37] flex items-center justify-center mb-3 shadow-xs">
           <Construction className="w-6 h-6" />
         </div>
-        <h3 className="text-sm font-semibold text-slate-900">
+        <h3 className="text-sm font-bold text-[#0B1120]">
           {title} Module Scheduled for Stage {stage}
         </h3>
         <p className="text-xs text-slate-500 max-w-md mt-1 leading-relaxed">

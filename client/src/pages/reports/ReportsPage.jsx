@@ -9,8 +9,9 @@ import {
 } from 'recharts';
 import { reportService } from '../../services/businessServices.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useNotification } from '../../context/NotificationContext.jsx';
 
-const COLORS = ['#0f172a', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+const COLORS = ['#0B1120', '#D4AF37', '#10b981', '#f59e0b', '#B89326', '#E0C068', '#162038', '#917118'];
 
 function KPICard({ title, value, icon: Icon, color, subtitle, trend }) {
   return (
@@ -45,6 +46,27 @@ export function ReportsPage() {
   const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exportingSales, setExportingSales] = useState(false);
+  const [exportingProducts, setExportingProducts] = useState(false);
+  const { toast } = useNotification() || {};
+
+  const handleExport = async (type) => {
+    const isSales = type === 'sales';
+    const setBusy = isSales ? setExportingSales : setExportingProducts;
+    try {
+      setBusy(true);
+      await reportService.downloadCsv(type, `${type}-report-${Date.now()}.csv`);
+      if (toast?.success) {
+        toast.success(`${isSales ? 'Sales' : 'Inventory'} CSV exported successfully`);
+      }
+    } catch (err) {
+      if (toast?.error) {
+        toast.error(err.message || `Failed to export ${type} CSV`);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -97,29 +119,29 @@ export function ReportsPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
           <span className="text-slate-400 text-xs">to</span>
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
           <button onClick={fetchData} className="p-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <a
-            href="/api/reports/export/sales"
-            target="_blank"
-            rel="noreferrer"
-            className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-subtle"
+          <button
+            type="button"
+            onClick={() => handleExport('sales')}
+            disabled={exportingSales}
+            className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-subtle disabled:opacity-60 cursor-pointer"
           >
-            Export Sales CSV
-          </a>
-          <a
-            href="/api/reports/export/products"
-            target="_blank"
-            rel="noreferrer"
-            className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-subtle"
+            {exportingSales ? 'Exporting...' : 'Export Sales CSV'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExport('products')}
+            disabled={exportingProducts}
+            className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors shadow-subtle disabled:opacity-60 cursor-pointer"
           >
-            Export Inventory CSV
-          </a>
+            {exportingProducts ? 'Exporting...' : 'Export Inventory CSV'}
+          </button>
         </div>
       </div>
 
@@ -128,7 +150,7 @@ export function ReportsPage() {
         <KPICard title="Total Revenue" value={`${currency}${(summary.totalRevenue || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
           icon={DollarSign} color="bg-emerald-50 text-emerald-600" subtitle="Net of refunds" />
         <KPICard title="Gross Profit" value={`${currency}${(summary.grossProfit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
-          icon={TrendingUp} color="bg-blue-50 text-blue-600" subtitle="Revenue − COGS" />
+          icon={TrendingUp} color="bg-[#FAF5E8] text-[#917118] border border-[#D4AF37]/30" subtitle="Revenue − COGS" />
         <KPICard title="Total Expenses" value={`${currency}${(summary.totalExpenses || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
           icon={ReceiptText} color="bg-amber-50 text-amber-600" subtitle="Operational costs" />
         <KPICard title="Net Operating Profit" value={`${currency}${(summary.netOperatingProfit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
@@ -147,17 +169,17 @@ export function ReportsPage() {
               <AreaChart data={salesTrend} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0f172a" stopOpacity={0.12} />
-                    <stop offset="95%" stopColor="#0f172a" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#737373' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#737373' }} axisLine={false} tickLine={false}
                   tickFormatter={v => `${currency}${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`} />
                 <Tooltip formatter={(v) => [`${currency}${v.toFixed(2)}`, 'Sales']}
-                  contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
-                <Area type="monotone" dataKey="sales" stroke="#0f172a" strokeWidth={2} fill="url(#salesGrad)" />
+                  contentStyle={{ borderRadius: 8, border: '1px solid rgba(212, 175, 55, 0.4)', backgroundColor: '#0B1120', color: '#FFFFFF', fontSize: 12 }} />
+                <Area type="monotone" dataKey="sales" stroke="#D4AF37" strokeWidth={2.5} fill="url(#salesGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -176,10 +198,10 @@ export function ReportsPage() {
             <>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={profitData} layout="vertical" margin={{ top: 0, right: 0, left: 50, bottom: 0 }}>
-                  <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false}
+                  <XAxis type="number" tick={{ fontSize: 10, fill: '#737373' }} axisLine={false} tickLine={false}
                     tickFormatter={v => `${currency}${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={v => [`${currency}${v.toFixed(2)}`]} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#525252' }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={v => [`${currency}${v.toFixed(2)}`]} contentStyle={{ borderRadius: 8, border: '1px solid rgba(212, 175, 55, 0.4)', backgroundColor: '#0B1120', color: '#FFFFFF', fontSize: 12 }} />
                   <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                     {profitData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
@@ -236,11 +258,11 @@ export function ReportsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500">Product</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500">Current Stock</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-500">Threshold</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">Selling Price</th>
+                <tr className="bg-[#0B1120] text-[#D4AF37] border-b-2 border-[#D4AF37]/40">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Product</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Current Stock</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Threshold</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Selling Price</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">

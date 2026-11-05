@@ -74,13 +74,13 @@ export function StockHistoryPage({ initialProductId, onBackToProducts }) {
         );
       case 'SALE':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#FAF5E8] text-[#917118] border border-[#D4AF37]/40">
             <ArrowDownRight className="w-3 h-3" /> Sale Fulfilled
           </span>
         );
       case 'RETURN':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#FAF5E8] text-[#6E5513] border border-[#D4AF37]/40">
             <RotateCcw className="w-3 h-3" /> Restocked Return
           </span>
         );
@@ -206,7 +206,7 @@ export function StockHistoryPage({ initialProductId, onBackToProducts }) {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200/80 bg-slate-50/75 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
+                <tr className="border-b-2 border-[#D4AF37]/40 bg-[#0B1120] text-[#D4AF37] font-semibold uppercase tracking-wider text-[10px]">
                   <th className="py-3 px-4">Timestamp</th>
                   <th className="py-3 px-4">Product / SKU</th>
                   <th className="py-3 px-4">Movement Type</th>
@@ -221,7 +221,7 @@ export function StockHistoryPage({ initialProductId, onBackToProducts }) {
                   const isPositive = m.quantity_change > 0;
 
                   return (
-                    <tr key={m.id} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={m.id} className="hover:bg-[#FAF5E8]/40 transition-colors">
                       <td className="py-3 px-4 text-slate-500 font-mono text-[11px] whitespace-nowrap">
                         {formatDateTime(m.created_at)}
                       </td>

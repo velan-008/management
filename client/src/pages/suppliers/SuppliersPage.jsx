@@ -171,7 +171,7 @@ export function SuppliersPage() {
     <div className="space-y-6">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-xl shadow-lg border border-slate-800 animate-in fade-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-[#0B1120] text-[#D4AF37] text-xs font-semibold px-4 py-3 rounded-xl shadow-popup border border-[#D4AF37]/40 animate-in fade-in slide-in-from-top-2">
           <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{notification}</span>
         </div>
@@ -201,7 +201,7 @@ export function SuppliersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search suppliers by name, company, phone, GSTIN..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] transition-colors"
           />
         </div>
       </div>
@@ -229,12 +229,12 @@ export function SuppliersPage() {
             return (
               <div
                 key={sup.id}
-                className="bg-white rounded-xl border border-slate-200 p-5 shadow-subtle hover:shadow-md transition-all flex flex-col justify-between"
+                className="bg-white rounded-xl border border-slate-200/90 hover:border-[#D4AF37]/50 p-5 shadow-subtle hover:shadow-gold transition-all flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-[#0B1120] text-[#D4AF37] border border-[#D4AF37]/30 font-bold text-sm flex items-center justify-center shrink-0">
                         {sup.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -294,7 +294,7 @@ export function SuppliersPage() {
                     size="sm"
                     variant="outline"
                     icon={CreditCard}
-                    className="flex-1 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                    className="flex-1 text-xs text-[#0B1120] border-[#D4AF37]/50 hover:bg-[#FAF5E8]"
                     onClick={() => {
                       setSelectedSupplier(sup);
                       setPayForm({
@@ -340,7 +340,7 @@ export function SuppliersPage() {
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               required
               placeholder="e.g. Britannia FMCG Depot"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"
             />
           </div>
 
@@ -351,7 +351,7 @@ export function SuppliersPage() {
               value={form.company_name}
               onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
               placeholder="e.g. Britannia Industries Logistics Ltd"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"
             />
           </div>
 
@@ -363,7 +363,7 @@ export function SuppliersPage() {
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="+1 555-0199"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"
               />
             </div>
             <div>
@@ -373,7 +373,7 @@ export function SuppliersPage() {
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="orders@supplier.com"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"
               />
             </div>
           </div>
@@ -386,7 +386,7 @@ export function SuppliersPage() {
                 value={form.gst_number}
                 onChange={(e) => setForm((f) => ({ ...f, gst_number: e.target.value }))}
                 placeholder="e.g. 27AABCB1234D1Z5"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"
               />
             </div>
             <div>
@@ -396,7 +396,7 @@ export function SuppliersPage() {
                 value={form.payment_terms}
                 onChange={(e) => setForm((f) => ({ ...f, payment_terms: e.target.value }))}
                 placeholder="e.g. Net 15 Days / Net 30"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"
               />
             </div>
           </div>
@@ -408,7 +408,7 @@ export function SuppliersPage() {
               value={form.address}
               onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
               placeholder="Depot street, city, state"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none"
             />
           </div>
 

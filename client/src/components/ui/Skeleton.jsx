@@ -12,7 +12,8 @@ export const Skeleton = ({
 
   return (
     <div
-      className={`animate-pulse bg-slate-200/80 ${variantStyles[variant]} ${className}`}
+      aria-hidden="true"
+      className={`animate-pulse bg-slate-200/80 ${variantStyles[variant] || variantStyles.rectangular} ${className}`}
     />
   );
 };

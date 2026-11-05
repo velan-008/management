@@ -32,31 +32,31 @@ export function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      {/* Tab Navigation Pill Bar */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-200/70 rounded-xl w-fit border border-slate-300/60 shadow-inner flex-wrap">
+      {/* Tab Navigation Pill Bar (Dark Navy + Golden) */}
+      <div className="flex items-center gap-1.5 p-1 bg-[#0B1120] rounded-xl w-fit border border-[#D4AF37]/40 shadow-md flex-wrap">
         <button
           type="button"
           onClick={() => setTab('products')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             currentTab === 'products'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#D4AF37] text-[#0B1120] shadow-xs'
+              : 'text-slate-300 hover:text-white hover:bg-[#162038]'
           }`}
         >
-          <Package className="w-4 h-4 text-slate-500" />
+          <Package className="w-4 h-4" />
           <span>Products</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab('categories')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             currentTab === 'categories'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#D4AF37] text-[#0B1120] shadow-xs'
+              : 'text-slate-300 hover:text-white hover:bg-[#162038]'
           }`}
         >
-          <Tag className="w-4 h-4 text-slate-500" />
+          <Tag className="w-4 h-4" />
           <span>Categories</span>
         </button>
 
@@ -64,52 +64,52 @@ export function InventoryPage() {
           type="button"
           aria-label="Sub-Types"
           onClick={() => setTab('sub-categories')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             currentTab === 'sub-categories'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#D4AF37] text-[#0B1120] shadow-xs'
+              : 'text-slate-300 hover:text-white hover:bg-[#162038]'
           }`}
         >
-          <Layers className="w-4 h-4 text-slate-500" />
+          <Layers className="w-4 h-4" />
           <span>Sub-Categories</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab('brands')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             currentTab === 'brands'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#D4AF37] text-[#0B1120] shadow-xs'
+              : 'text-slate-300 hover:text-white hover:bg-[#162038]'
           }`}
         >
-          <Award className="w-4 h-4 text-slate-500" />
+          <Award className="w-4 h-4" />
           <span>Brands</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab('units')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             currentTab === 'units'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#D4AF37] text-[#0B1120] shadow-xs'
+              : 'text-slate-300 hover:text-white hover:bg-[#162038]'
           }`}
         >
-          <Scale className="w-4 h-4 text-slate-500" />
+          <Scale className="w-4 h-4" />
           <span>Units</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab('history')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
             currentTab === 'history'
-              ? 'bg-white text-slate-900 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              ? 'bg-[#D4AF37] text-[#0B1120] shadow-xs'
+              : 'text-slate-300 hover:text-white hover:bg-[#162038]'
           }`}
         >
-          <History className="w-4 h-4 text-slate-500" />
+          <History className="w-4 h-4" />
           <span>Movement History</span>
         </button>
       </div>

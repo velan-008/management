@@ -6,12 +6,17 @@ import { apiResponse } from '../utils/apiResponse.js';
 export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    let token = null;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return apiResponse.error(res, 'Authorization token required', 401, 'UNAUTHORIZED');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.query?.token) {
+      token = req.query.token;
     }
 
-    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return apiResponse.error(res, 'Authorization token required', 401, 'UNAUTHORIZED');
+    }
 
     let decoded;
     try {

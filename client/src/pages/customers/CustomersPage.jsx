@@ -38,19 +38,19 @@ function CustomerForm({ customer, onSave, onClose }) {
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Full Name *</label>
           <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
             placeholder="Customer name" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Phone</label>
           <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
             placeholder="+91 9999999999" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Email</label>
           <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
             placeholder="email@example.com" />
         </div>
         <div>
@@ -58,7 +58,7 @@ function CustomerForm({ customer, onSave, onClose }) {
           <select
             value={form.customer_type}
             onChange={e => setForm(f => ({ ...f, customer_type: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
           >
             <option value="RETAIL">Retail Customer</option>
             <option value="WHOLESALE">Wholesale Customer</option>
@@ -67,12 +67,12 @@ function CustomerForm({ customer, onSave, onClose }) {
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Credit Limit</label>
           <input type="number" min="0" step="0.01" value={form.credit_limit} onChange={e => setForm(f => ({ ...f, credit_limit: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]" />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Address</label>
           <textarea value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} rows={2}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] resize-none"
             placeholder="Full address" />
         </div>
       </div>
@@ -160,7 +160,7 @@ export function CustomersPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-          className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+          className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
           placeholder="Search by name, phone, or email..." />
       </div>
 
@@ -168,13 +168,13 @@ export function CustomersPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Name</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Type</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Contact</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Outstanding</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Credit Limit</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
+              <tr className="bg-[#0B1120] text-[#D4AF37] border-b-2 border-[#D4AF37]/40">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Contact</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Outstanding</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Credit Limit</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -191,23 +191,23 @@ export function CustomersPage() {
                 customers.map(c => {
                   const isWholesale = c.customer_type === 'WHOLESALE' || c.customer_type === 'SUB_WHOLESALER' || c.customer_type === 'BULK';
                   return (
-                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                    <tr key={c.id} className="hover:bg-[#FAF5E8]/40 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold flex items-center justify-center shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-[#FAF5E8] border border-[#D4AF37]/30 text-[#0B1120] text-xs font-bold flex items-center justify-center shrink-0">
                             {c.name.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-medium text-slate-900">{c.name}</p>
+                            <p className="font-semibold text-slate-900">{c.name}</p>
                             {c.address && <p className="text-[11px] text-slate-400 truncate max-w-xs">{c.address}</p>}
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${
                           isWholesale
-                            ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            ? 'bg-[#FAF5E8] text-[#917118] border border-[#D4AF37]/40'
+                            : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                         }`}>
                           {isWholesale ? 'Wholesale' : 'Retail'}
                         </span>
@@ -218,9 +218,9 @@ export function CustomersPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {parseFloat(c.outstanding_balance) > 0 ? (
-                          <span className="text-amber-600 font-medium font-mono">{currency}{parseFloat(c.outstanding_balance).toFixed(2)}</span>
+                          <span className="text-amber-700 font-bold font-mono">{currency}{parseFloat(c.outstanding_balance).toFixed(2)}</span>
                         ) : (
-                          <span className="text-emerald-600 text-xs">Settled</span>
+                          <span className="text-emerald-700 font-semibold text-xs">Settled</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-slate-600">{currency}{parseFloat(c.credit_limit || 0).toFixed(2)}</td>
@@ -229,7 +229,7 @@ export function CustomersPage() {
                           <button
                             onClick={() => handleOpenView(c)}
                             title="View statement & purchases"
-                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-400 hover:text-[#0B1120] hover:bg-[#FAF5E8] rounded-lg transition-colors"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -331,7 +331,7 @@ export function CustomersPage() {
                     <tbody className="divide-y divide-slate-100">
                       {customerSales.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-50">
-                          <td className="py-2 px-3 font-mono font-bold text-indigo-600">{s.invoice_number}</td>
+                          <td className="py-2 px-3 font-mono font-bold text-[#0B1120]">{s.invoice_number}</td>
                           <td className="py-2 px-3 text-slate-500">{s.invoice_date}</td>
                           <td className="py-2 px-3 text-right font-mono font-semibold">{currency}{parseFloat(s.grand_total).toFixed(2)}</td>
                           <td className="py-2 px-3 text-right font-mono text-emerald-600">{currency}{parseFloat(s.paid_amount).toFixed(2)}</td>

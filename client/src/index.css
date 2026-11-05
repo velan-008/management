@@ -4,12 +4,12 @@
 
 @layer base {
   body {
-    @apply bg-[#F8FAFC] text-slate-800 antialiased font-sans;
+    @apply bg-[#F8F8F8] text-[#0B1120] antialiased font-sans;
   }
 
   /* Accessible visible focus states */
   *:focus-visible {
-    @apply outline-none ring-2 ring-slate-900 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-[#D4AF37] ring-offset-2 ring-offset-white;
   }
 }
 
@@ -24,10 +24,90 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #D1D5DB;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #D4AF37;
+}
+
+/* Direct print container: strictly hidden on screen */
+@media screen {
+  #invoice-print-direct-container {
+    display: none !important;
+  }
+}
+
+/* =========================================================================
+   PRINT STYLES FOR THERMAL RECEIPT & A4 TAX INVOICE
+========================================================================= */
+@media print {
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  /* When direct print container exists on body, hide everything else */
+  body:has(#invoice-print-direct-container) > *:not(#invoice-print-direct-container) {
+    display: none !important;
+  }
+
+  #invoice-print-direct-container {
+    display: block !important;
+    position: static !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  #invoice-print-direct-container #invoice-print-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  #invoice-print-direct-container table {
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+
+  #invoice-print-direct-container tr {
+    page-break-inside: avoid !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* thermal format */
+@media print {
+  .print-thermal {
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 auto !important;
+    font-size: 11px !important;
+    padding: 2mm 0 !important;
+  }
+}
+
+/* A4 format */
+@media print {
+  .print-a4 {
+    width: 190mm !important;
+    max-width: 190mm !important;
+    margin: 0 auto !important;
+    font-size: 13px !important;
+    padding: 0 !important;
+  }
 }

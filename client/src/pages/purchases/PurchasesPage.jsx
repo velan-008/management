@@ -250,7 +250,7 @@ export function PurchasesPage() {
     <div className="space-y-6">
       {/* Toast Notification */}
       {notification && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-xl shadow-lg border border-slate-800 animate-in fade-in slide-in-from-top-2">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-[#0B1120] text-[#D4AF37] text-xs font-semibold px-4 py-3 rounded-xl shadow-popup border border-[#D4AF37]/40 animate-in fade-in slide-in-from-top-2">
           <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{notification}</span>
         </div>
@@ -298,7 +298,7 @@ export function PurchasesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search PO #, supplier name..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 transition-colors"
+            className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] transition-colors"
           />
         </div>
 
@@ -313,10 +313,10 @@ export function PurchasesPage() {
             <button
               key={tab.value}
               onClick={() => setStatusFilter(tab.value)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                 statusFilter === tab.value
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  ? 'bg-[#0B1120] text-[#D4AF37] font-bold shadow-xs border border-[#D4AF37]/30'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-[#FAF5E8]'
               }`}
             >
               {tab.label}
@@ -342,7 +342,7 @@ export function PurchasesPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-subtle overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+              <thead className="bg-[#0B1120] border-b-2 border-[#D4AF37]/40 text-[#D4AF37] font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="py-3 px-4">PO / Invoice #</th>
                   <th className="py-3 px-4">Supplier</th>
@@ -361,7 +361,7 @@ export function PurchasesPage() {
                   const isCancelled = po.status === 'CANCELLED';
 
                   return (
-                    <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={po.id} className="hover:bg-[#FAF5E8]/40 transition-colors">
                       <td className="py-3 px-4 font-bold text-slate-900">{po.invoice_number}</td>
                       <td className="py-3 px-4 text-slate-700 font-medium">
                         {po.supplier?.name || 'Wholesale Supplier'}
@@ -420,7 +420,7 @@ export function PurchasesPage() {
                               size="sm"
                               variant="outline"
                               icon={CreditCard}
-                              className="px-2 py-1 text-[11px] text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                              className="px-2 py-1 text-[11px] text-[#0B1120] border-[#D4AF37]/50 hover:bg-[#FAF5E8]"
                               title="Record Payment"
                               onClick={() => {
                                 setSelectedPurchase(po);
@@ -471,7 +471,7 @@ export function PurchasesPage() {
                 value={poForm.supplier_id}
                 onChange={(e) => setPoForm((f) => ({ ...f, supplier_id: e.target.value }))}
                 required
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900 bg-white"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none bg-white"
               >
                 <option value="">-- Choose Supplier --</option>
                 {suppliers.map((s) => (
@@ -488,7 +488,7 @@ export function PurchasesPage() {
                 type="date"
                 value={poForm.purchase_date}
                 onChange={(e) => setPoForm((f) => ({ ...f, purchase_date: e.target.value }))}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-slate-900"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:outline-none bg-white"
               />
             </div>
           </div>
@@ -500,7 +500,7 @@ export function PurchasesPage() {
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                className="text-xs font-bold text-[#D4AF37] hover:text-[#B89326] flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Product
               </button>

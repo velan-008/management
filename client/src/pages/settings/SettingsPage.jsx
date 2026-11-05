@@ -36,10 +36,10 @@ export function SettingsPage() {
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id
-                ? 'border-slate-900 text-slate-900'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-[#D4AF37] text-[#0B1120] font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}>
-            <tab.icon className="w-4 h-4" />
+            <tab.icon className="w-4 h-4 text-[#D4AF37]" />
             {tab.label}
           </button>
         ))}
@@ -170,24 +170,24 @@ function BusinessSettings({ business, refreshUser, onSave }) {
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Business Name</label>
           <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Business Email</label>
           <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Phone</label>
           <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Default Tax Rate (%)</label>
           <select
             value={Number(form.tax_rate)}
             onChange={e => setForm(f => ({ ...f, tax_rate: parseFloat(e.target.value) || 0 }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white bg-white"
           >
             {DEFAULT_TAX_RATES.map(r => (
               <option key={r.value} value={r.value}>{r.label}</option>
@@ -200,13 +200,13 @@ function BusinessSettings({ business, refreshUser, onSave }) {
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">State / Region</label>
           <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
             placeholder="e.g. Maharashtra" />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Address</label>
           <textarea value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} rows={2}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white resize-none" />
         </div>
       </div>
       <Button type="submit" isLoading={loading}>Save Business Settings</Button>
@@ -245,12 +245,12 @@ function ProfileSettings({ user, onSave }) {
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Full Name</label>
           <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
         <div className="col-span-2">
           <label className="block text-xs font-medium text-slate-700 mb-1">Email Address</label>
           <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
       </div>
       <Button type="submit" isLoading={loading}>Update Profile</Button>
@@ -286,17 +286,17 @@ function SecuritySettings({ onSave }) {
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Current Password</label>
           <input type="password" value={form.current_password} onChange={e => setForm(f => ({ ...f, current_password: e.target.value }))} required
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">New Password</label>
           <input type="password" value={form.new_password} onChange={e => setForm(f => ({ ...f, new_password: e.target.value }))} required
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Confirm New Password</label>
           <input type="password" value={form.confirm_password} onChange={e => setForm(f => ({ ...f, confirm_password: e.target.value }))} required
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white" />
         </div>
       </div>
       <Button type="submit" isLoading={loading} icon={Lock}>Change Password</Button>

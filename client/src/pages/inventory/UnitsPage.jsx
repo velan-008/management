@@ -165,7 +165,7 @@ export function UnitsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
         <div>
           <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Scale className="w-5 h-5 text-emerald-600" />
+            <Scale className="w-5 h-5 text-[#D4AF37]" />
             <span>Units Master</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -195,7 +195,7 @@ export function UnitsPage() {
           placeholder="Search units by name or code..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all shadow-xs"
+          className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] focus:border-transparent transition-all shadow-xs"
         />
       </div>
 
@@ -236,13 +236,13 @@ export function UnitsPage() {
             return (
               <div
                 key={item.id}
-                className="bg-white rounded-xl border border-slate-200 hover:border-slate-300 p-4 flex flex-col justify-between transition-all hover:shadow-sm"
+                className="bg-white rounded-xl border border-slate-200/90 hover:border-[#D4AF37]/50 p-4 flex flex-col justify-between transition-all shadow-subtle hover:shadow-gold"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold bg-slate-900 text-white px-2 py-0.5 rounded-md shrink-0">
+                        <span className="font-mono text-xs font-bold bg-[#0B1120] text-[#D4AF37] border border-[#D4AF37]/30 px-2 py-0.5 rounded-md shrink-0">
                           {item.code}
                         </span>
                         <h3 className="text-sm font-bold text-slate-900 truncate">{item.name}</h3>
@@ -350,7 +350,7 @@ export function UnitsPage() {
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={2}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] resize-none"
               />
             </div>
 
@@ -359,7 +359,7 @@ export function UnitsPage() {
               <select
                 value={form.status}
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
               >
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="INACTIVE">INACTIVE</option>

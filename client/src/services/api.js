@@ -25,9 +25,19 @@ api.interceptors.response.use(
   (response) => {
     return response.data;
   },
-  (error) => {
+  async (error) => {
     const status = error.response ? error.response.status : null;
-    const responseData = error.response ? error.response.data : null;
+    let responseData = error.response ? error.response.data : null;
+
+    // If error response is a Blob (e.g. from a binary/blob request), extract JSON error payload
+    if (responseData instanceof Blob) {
+      try {
+        const text = await responseData.text();
+        responseData = JSON.parse(text);
+      } catch (_) {
+        // keep responseData as is
+      }
+    }
 
     // Handle session expiration / unauthorized access
     if (status === 401) {

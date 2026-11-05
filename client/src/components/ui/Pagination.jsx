@@ -15,11 +15,11 @@ export const Pagination = ({
   const endItem = Math.min(currentPage * pageSize, totalItems);
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-500 bg-white">
       <div>
-        Showing <strong className="text-slate-800">{startItem}</strong> to{' '}
-        <strong className="text-slate-800">{endItem}</strong> of{' '}
-        <strong className="text-slate-800">{totalItems}</strong> entries
+        Showing <strong className="text-[#0B1120] font-bold">{startItem}</strong> to{' '}
+        <strong className="text-[#0B1120] font-bold">{endItem}</strong> of{' '}
+        <strong className="text-[#0B1120] font-bold">{totalItems}</strong> entries
       </div>
 
       <div className="flex items-center gap-1.5 self-end sm:self-auto">
@@ -33,7 +33,7 @@ export const Pagination = ({
           Previous
         </Button>
 
-        <span className="px-2 font-medium text-slate-700">
+        <span className="px-2.5 py-1 rounded-md bg-[#FAF5E8] border border-[#D4AF37]/30 font-bold text-[#0B1120] text-xs">
           Page {currentPage} of {totalPages}
         </span>
 

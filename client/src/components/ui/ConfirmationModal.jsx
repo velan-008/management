@@ -17,46 +17,52 @@ export const ConfirmationModal = ({
   const icons = {
     danger: <AlertCircle className="w-6 h-6 text-rose-600" />,
     warning: <AlertTriangle className="w-6 h-6 text-amber-600" />,
-    info: <Info className="w-6 h-6 text-indigo-600" />
+    info: <Info className="w-6 h-6 text-[#D4AF37]" />
   };
 
   const bgStyles = {
-    danger: 'bg-rose-50 border-rose-100',
-    warning: 'bg-amber-50 border-amber-100',
-    info: 'bg-indigo-50 border-indigo-100'
+    danger: 'bg-rose-50 border-rose-200',
+    warning: 'bg-amber-50 border-amber-200',
+    info: 'bg-[#FAF5E8] border-[#D4AF37]/30'
   };
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
-      <div className="space-y-4">
-        <div className="flex items-start gap-3">
-          <div className={`p-2.5 rounded-xl border shrink-0 ${bgStyles[variant] || bgStyles.danger}`}>
-            {icons[variant] || icons.danger}
-          </div>
-          <div className="text-sm text-slate-600 leading-relaxed pt-0.5">
-            {message}
-          </div>
-        </div>
+  const footer = (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onClose}
+        disabled={isLoading}
+      >
+        {cancelText}
+      </Button>
+      <Button
+        type="button"
+        variant={variant === 'danger' ? 'danger' : 'primary'}
+        size="sm"
+        onClick={onConfirm}
+        isLoading={isLoading}
+      >
+        {confirmText}
+      </Button>
+    </>
+  );
 
-        <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            {cancelText}
-          </Button>
-          <Button
-            type="button"
-            variant={variant === 'danger' ? 'danger' : 'primary'}
-            size="sm"
-            onClick={onConfirm}
-            isLoading={isLoading}
-          >
-            {confirmText}
-          </Button>
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={title}
+      size="sm"
+      footer={footer}
+    >
+      <div className="flex items-start gap-3.5 py-1">
+        <div className={`p-2.5 rounded-xl border shrink-0 ${bgStyles[variant] || bgStyles.danger}`}>
+          {icons[variant] || icons.danger}
+        </div>
+        <div className="text-xs sm:text-sm text-slate-700 leading-relaxed pt-0.5">
+          {message}
         </div>
       </div>
     </Modal>

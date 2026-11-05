@@ -27,6 +27,7 @@ export const reportService = {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - (periodDays - 1));
     startDate.setHours(0, 0, 0, 0);
+    const startDateStr = startDate.toISOString().split('T')[0];
 
     // 1. Fetch completed or partially refunded sales for business
     const sales = await Sale.findAll({
@@ -44,21 +45,24 @@ export const reportService = {
       ]
     });
 
-    let totalRevenue = 0;
-    let totalTaxCollected = 0;
-    let totalDiscounts = 0;
-    let totalCOGS = 0;
-    let totalTaxableSales = 0;
+    // Filter sales and expenses for the selected period (e.g. Last 7 Days, 14 Days, 30 Days)
+    const periodSales = sales.filter((s) => s.invoice_date >= startDateStr);
 
-    for (const sale of sales) {
+    let periodRevenue = 0;
+    let periodTaxCollected = 0;
+    let periodDiscounts = 0;
+    let periodCOGS = 0;
+    let periodTaxableSales = 0;
+
+    for (const sale of periodSales) {
       const grandTotal = parseFloat(sale.grand_total) || 0;
       const orderDiscount = parseFloat(sale.order_discount) || 0;
       const taxTotal = parseFloat(sale.tax_total) || 0;
       const refunded = parseFloat(sale.refunded_amount) || 0;
 
-      totalRevenue += (grandTotal - refunded);
-      totalTaxCollected += taxTotal;
-      totalDiscounts += orderDiscount;
+      periodRevenue += (grandTotal - refunded);
+      periodTaxCollected += taxTotal;
+      periodDiscounts += orderDiscount;
 
       if (sale.items && sale.items.length > 0) {
         for (const item of sale.items) {
@@ -66,10 +70,18 @@ export const reportService = {
           const cost = parseFloat(item.unit_cost_price) || 0;
           const taxable = parseFloat(item.taxable_amount) || 0;
 
-          totalCOGS += (qty * cost);
-          totalTaxableSales += taxable;
+          periodCOGS += (qty * cost);
+          periodTaxableSales += taxable;
         }
       }
+    }
+
+    // All-time revenue for total business context
+    let allTimeRevenue = 0;
+    for (const sale of sales) {
+      const grandTotal = parseFloat(sale.grand_total) || 0;
+      const refunded = parseFloat(sale.refunded_amount) || 0;
+      allTimeRevenue += (grandTotal - refunded);
     }
 
     // 2. Fetch expenses
@@ -77,15 +89,20 @@ export const reportService = {
       where: { business_id: businessId }
     });
 
-    const totalExpenses = expenses.reduce(
+    const periodExpenses = expenses.filter((e) => e.expense_date >= startDateStr);
+    const periodTotalExpenses = periodExpenses.reduce(
+      (sum, exp) => sum + (parseFloat(exp.amount) || 0),
+      0
+    );
+    const allTimeTotalExpenses = expenses.reduce(
       (sum, exp) => sum + (parseFloat(exp.amount) || 0),
       0
     );
 
-    // Accounting computations
-    const netSales = Math.max(0, totalTaxableSales - totalDiscounts);
-    const grossProfit = netSales - totalCOGS;
-    const netOperatingProfit = grossProfit - totalExpenses;
+    // Accounting computations for the period
+    const netSales = Math.max(0, periodTaxableSales - periodDiscounts);
+    const grossProfit = netSales - periodCOGS;
+    const netOperatingProfit = grossProfit - periodTotalExpenses;
 
     // 3. Low stock alert items (quantity <= low_stock_threshold)
     const lowStockProducts = await Product.findAll({
@@ -155,18 +172,27 @@ export const reportService = {
       limit: 6
     });
 
-    // 6. Wholesale & Today Specific Metrics
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todaySalesList = sales.filter((s) => s.invoice_date === todayStr);
+    // 6. Wholesale & Today Specific Metrics (support both UTC and local date comparisons)
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const isToday = (d) => d === todayUtc || d === todayLocal;
+
+    const todaySalesList = sales.filter((s) => isToday(s.invoice_date) || (s.createdAt && isToday(new Date(s.createdAt).toISOString().slice(0, 10))));
     const todaySales = todaySalesList.reduce((sum, s) => sum + (parseFloat(s.grand_total) || 0) - (parseFloat(s.refunded_amount) || 0), 0);
     const todayBillsCount = todaySalesList.length;
 
-    const todayExpensesList = expenses.filter((e) => e.expense_date === todayStr);
+    const todayExpensesList = expenses.filter((e) => isToday(e.expense_date) || (e.createdAt && isToday(new Date(e.createdAt).toISOString().slice(0, 10))));
     const todayExpenses = todayExpensesList.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
 
     // Today's purchases
     const purchasesToday = await Purchase.findAll({
-      where: { business_id: businessId, purchase_date: todayStr }
+      where: {
+        business_id: businessId,
+        purchase_date: {
+          [Op.in]: [todayUtc, todayLocal]
+        }
+      }
     });
     const todayPurchases = purchasesToday.reduce((sum, p) => sum + (parseFloat(p.grand_total) || 0), 0);
 
@@ -201,24 +227,46 @@ export const reportService = {
       }
     }
 
-    // Customer Receivables (Total outstanding balance)
+    // Customer Receivables (Total outstanding balance from customer profiles or sales balance due)
     const customers = await Customer.findAll({
       where: { business_id: businessId },
       attributes: ['outstanding_balance']
     });
-    const totalCustomerOutstanding = customers.reduce((sum, c) => sum + (parseFloat(c.outstanding_balance) || 0), 0);
+    const customerBalanceSum = customers.reduce((sum, c) => sum + (parseFloat(c.outstanding_balance) || 0), 0);
+    const saleBalanceSum = (await Sale.sum('balance_due', {
+      where: {
+        business_id: businessId,
+        payment_status: { [Op.in]: ['UNPAID', 'PARTIALLY_PAID'] },
+        status: { [Op.ne]: 'CANCELLED' }
+      }
+    })) || 0;
+    const totalCustomerOutstanding = Math.max(customerBalanceSum, parseFloat(saleBalanceSum) || 0);
 
-    // Supplier Payables (Total outstanding balance)
+    // Supplier Payables (Total outstanding balance from supplier profiles or purchase balance due)
     const suppliers = await Supplier.findAll({
       where: { business_id: businessId },
       attributes: ['outstanding_balance']
     });
-    const totalSupplierOutstanding = suppliers.reduce((sum, s) => sum + (parseFloat(s.outstanding_balance) || 0), 0);
+    const supplierBalanceSum = suppliers.reduce((sum, s) => sum + (parseFloat(s.outstanding_balance) || 0), 0);
+    const purchaseBalanceSum = (await Purchase.sum('balance_due', {
+      where: {
+        business_id: businessId,
+        payment_status: { [Op.in]: ['UNPAID', 'PARTIALLY_PAID'] },
+        status: { [Op.ne]: 'CANCELLED' }
+      }
+    })) || 0;
+    const totalSupplierOutstanding = Math.max(supplierBalanceSum, parseFloat(purchaseBalanceSum) || 0);
 
-    // Payment collection breakdown
-    const allPayments = await Payment.findAll({
-      where: { business_id: businessId }
+    // Payment collection breakdown (for the selected period)
+    const periodPayments = await Payment.findAll({
+      where: {
+        business_id: businessId,
+        payment_date: {
+          [Op.gte]: startDate
+        }
+      }
     });
+    const paymentsToCount = periodPayments.length > 0 ? periodPayments : await Payment.findAll({ where: { business_id: businessId } });
     const paymentCollections = {
       CASH: 0,
       UPI: 0,
@@ -226,7 +274,7 @@ export const reportService = {
       BANK_TRANSFER: 0,
       OTHER: 0
     };
-    for (const p of allPayments) {
+    for (const p of paymentsToCount) {
       const meth = p.payment_method || 'CASH';
       paymentCollections[meth] = (paymentCollections[meth] || 0) + (parseFloat(p.amount) || 0);
     }
@@ -241,13 +289,19 @@ export const reportService = {
 
     return {
       summary: {
-        totalRevenue: Math.round(totalRevenue * 100) / 100,
-        transactionsCount: sales.length,
-        totalExpenses: Math.round(totalExpenses * 100) / 100,
-        cogs: Math.round(totalCOGS * 100) / 100,
+        totalRevenue: Math.round(periodRevenue * 100) / 100,
+        transactionsCount: periodSales.length,
+        periodRevenue: Math.round(periodRevenue * 100) / 100,
+        periodOrdersCount: periodSales.length,
+        allTimeRevenue: Math.round(allTimeRevenue * 100) / 100,
+        allTimeTransactionsCount: sales.length,
+        totalExpenses: Math.round(periodTotalExpenses * 100) / 100,
+        allTimeExpenses: Math.round(allTimeTotalExpenses * 100) / 100,
+        cogs: Math.round(periodCOGS * 100) / 100,
         grossProfit: Math.round(grossProfit * 100) / 100,
         netOperatingProfit: Math.round(netOperatingProfit * 100) / 100,
         lowStockCount: lowStockProducts.length,
+        periodDays,
         // Wholesale extensions
         todaySales: Math.round(todaySales * 100) / 100,
         todayBillsCount,

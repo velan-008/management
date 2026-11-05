@@ -18,6 +18,7 @@ export const RecentTransactions = ({
     <Card
       title="Recent Invoices & Transactions"
       subtitle="Latest sales processed in the store"
+      className="border border-slate-200/90 shadow-subtle hover:border-[#D4AF37]/40 transition-colors"
     >
       {isLoading ? (
         <div className="space-y-2">
@@ -34,31 +35,31 @@ export const RecentTransactions = ({
         <div className="overflow-x-auto -mx-5 -mb-5">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-y border-slate-100 bg-slate-50/75 text-slate-500 font-semibold uppercase tracking-wider text-[10px]">
-                <th className="py-2.5 px-5">Invoice #</th>
-                <th className="py-2.5 px-4">Date</th>
-                <th className="py-2.5 px-4">Customer</th>
-                <th className="py-2.5 px-4">Cashier</th>
-                <th className="py-2.5 px-4 text-right">Grand Total</th>
-                <th className="py-2.5 px-5 text-right">Status</th>
+              <tr className="border-b-2 border-[#D4AF37]/40 bg-[#0B1120] text-[#D4AF37] font-semibold uppercase tracking-wider text-[10px]">
+                <th className="py-3 px-5">Invoice #</th>
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Customer</th>
+                <th className="py-3 px-4">Cashier</th>
+                <th className="py-3 px-4 text-right">Grand Total</th>
+                <th className="py-3 px-5 text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-slate-100 text-slate-800">
               {transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3 px-5 font-mono font-semibold text-slate-900">
+                <tr key={tx.id} className="hover:bg-[#FAF5E8]/40 transition-colors">
+                  <td className="py-3 px-5 font-mono font-bold text-[#0B1120]">
                     {tx.invoiceNumber}
                   </td>
                   <td className="py-3 px-4 text-slate-500">
                     {tx.invoiceDate}
                   </td>
-                  <td className="py-3 px-4 font-medium text-slate-800">
+                  <td className="py-3 px-4 font-semibold text-slate-800">
                     {tx.customerName}
                   </td>
                   <td className="py-3 px-4 text-slate-500">
                     {tx.cashierName}
                   </td>
-                  <td className="py-3 px-4 text-right font-semibold text-slate-900">
+                  <td className="py-3 px-4 text-right font-mono font-bold text-[#0B1120]">
                     {formatCurrency(tx.grandTotal)}
                   </td>
                   <td className="py-3 px-5 text-right">
