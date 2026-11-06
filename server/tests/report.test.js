@@ -85,4 +85,49 @@ describe('BUSINESSFLOW — Dashboard & Report API Tests', () => {
     expect(summary.transactionsCount).toBe(0);
     expect(recentTransactions.length).toBe(0);
   });
+
+  it('should return GST outward supplies report with actual invoice tax breakdowns', async () => {
+    const res = await request(app)
+      .get('/api/reports/gst')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.records).toBeInstanceOf(Array);
+    expect(res.body.data.summary).toBeDefined();
+    expect(res.body.data.summary.totalTax).toBeGreaterThan(0);
+    expect(res.body.data.summary.totalTaxable).toBeGreaterThan(0);
+    expect(res.body.data.records[0]).toHaveProperty('invoice_number');
+    expect(res.body.data.records[0]).toHaveProperty('taxable_amount');
+    expect(res.body.data.records[0]).toHaveProperty('tax_amount');
+  });
+
+  it('should return payments register report with payment method totals', async () => {
+    const res = await request(app)
+      .get('/api/reports/payments')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.payments).toBeInstanceOf(Array);
+    expect(res.body.data.summary).toBeDefined();
+    expect(res.body.data.summary.totalAmount).toBeGreaterThan(0);
+  });
+
+  it('should return operating expenses report with accurate summary and category breakdowns', async () => {
+    const res = await request(app)
+      .get('/api/reports/expenses')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.expenses).toBeInstanceOf(Array);
+    expect(res.body.data.summary).toBeDefined();
+    expect(res.body.data.summary.totalExpenses).toBeGreaterThan(0);
+    expect(res.body.data.summary.totalCount).toBeGreaterThan(0);
+    expect(res.body.data.expenses[0]).toHaveProperty('category');
+    expect(res.body.data.expenses[0]).toHaveProperty('amount');
+    expect(res.body.data.expenses[0]).toHaveProperty('expense_date');
+    expect(res.body.data.expenses[0]).toHaveProperty('payment_method');
+  });
 });

@@ -30,15 +30,26 @@ router.get('/health', async (req, res) => {
     dbStatus = 'DOWN';
   }
 
+  const isHealthy = dbStatus === 'UP';
+  const payload = {
+    status: isHealthy ? 'OK' : 'DEGRADED',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    database: dbStatus
+  };
+
+  if (!isHealthy) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database connection unavailable',
+      data: payload
+    });
+  }
+
   return apiResponse.success(
     res,
-    {
-      status: 'OK',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV,
-      database: dbStatus
-    },
+    payload,
     'Service is healthy'
   );
 });

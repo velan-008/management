@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  ShoppingCart, Plus, Minus, Trash2, Search, User, ChevronDown,
+  ShoppingCart, Plus, Minus, Trash2, Search, User, UserPlus, ChevronDown,
   CreditCard, Banknote, Smartphone, Calculator, CheckCircle, AlertCircle,
   PauseCircle, Printer, Boxes, Box, Package, X, Check, Clock
 } from 'lucide-react';
@@ -11,6 +11,11 @@ import { productService, customerService, invoiceService } from '../../services/
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatCurrency as formatCur } from '../../utils/formatters.js';
 import { InvoiceDocument } from '../../components/invoice/InvoiceDocument.jsx';
+import { ConnectionBadge } from '../../components/pos/ConnectionBadge.jsx';
+import { masterDataCache } from '../../offline/masterDataCache.js';
+import { cartPersistence } from '../../offline/cartPersistence.js';
+import { offlineInvoiceManager, generateUUID } from '../../offline/offlineInvoiceManager.js';
+import { connectionManager, CONNECTION_STATUS } from '../../offline/connectionManager.js';
 
 export function POSPage() {
   const { user, business, isAdmin } = useAuth();
@@ -50,6 +55,18 @@ export function POSPage() {
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [pricingMode, setPricingMode] = useState('WHOLESALE'); // 'WHOLESALE' | 'RETAIL'
 
+  // Add Customer Modal State
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    phone: '',
+    customer_type: 'RETAIL',
+    address: '',
+    tax_number: ''
+  });
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [addCustomerError, setAddCustomerError] = useState('');
+
   // Cart State
   const [cart, setCart] = useState([]);
   const [orderDiscount, setOrderDiscount] = useState(0);
@@ -84,10 +101,55 @@ export function POSPage() {
     }
   });
   const [showHeldModal, setShowHeldModal] = useState(false);
+  const cartRestoredRef = useRef(false);
 
-  // 1. Initial Data Fetching
+  // Cache business details whenever available
   useEffect(() => {
-    productService.listCategories().then(r => setCategories(r.data?.categories || [])).catch(() => {});
+    if (business) {
+      masterDataCache.cacheBusiness(business);
+    }
+  }, [business]);
+
+  // Cart Recovery Foundation: Restore saved active cart from IndexedDB on refresh
+  useEffect(() => {
+    cartPersistence.load().then((saved) => {
+      if (saved && Array.isArray(saved.cart) && saved.cart.length > 0) {
+        setCart(saved.cart);
+        if (saved.selectedCustomer) setSelectedCustomer(saved.selectedCustomer);
+        if (saved.pricingMode) setPricingMode(saved.pricingMode);
+        if (saved.orderDiscount) setOrderDiscount(saved.orderDiscount);
+        if (saved.paymentMode) setPaymentMode(saved.paymentMode);
+      }
+      cartRestoredRef.current = true;
+    }).catch(() => {
+      cartRestoredRef.current = true;
+    });
+  }, []);
+
+  // Cart Persistence: Automatically save in-progress cart to IndexedDB
+  useEffect(() => {
+    if (!cartRestoredRef.current) return;
+    cartPersistence.save({
+      cart,
+      selectedCustomer,
+      pricingMode,
+      orderDiscount,
+      paymentMode
+    });
+  }, [cart, selectedCustomer, pricingMode, orderDiscount, paymentMode]);
+
+  // 1. Initial Data Fetching with IndexedDB Master Data Caching
+  useEffect(() => {
+    productService.listCategories()
+      .then(r => {
+        const cats = r.data?.categories || [];
+        setCategories(cats);
+        masterDataCache.cacheCategories(cats);
+      })
+      .catch(async () => {
+        const cachedCats = await masterDataCache.getCachedCategories();
+        if (cachedCats && cachedCats.length > 0) setCategories(cachedCats);
+      });
   }, []);
 
   const fetchProducts = useCallback(async () => {
@@ -97,13 +159,22 @@ export function POSPage() {
       const prods = res.data?.products || [];
       setProducts(prods);
       setSearchResults(prods);
+      masterDataCache.cacheProducts(prods);
     } catch {
       try {
         const res = await productService.search('', { limit: 100 });
         const prods = res.data?.products || [];
         setProducts(prods);
         setSearchResults(prods);
-      } catch {}
+        masterDataCache.cacheProducts(prods);
+      } catch {
+        // Fallback: Read products from IndexedDB local cache when network is down
+        const cachedProds = await masterDataCache.getCachedProducts();
+        if (cachedProds && cachedProds.length > 0) {
+          setProducts(cachedProds);
+          setSearchResults(cachedProds);
+        }
+      }
     } finally {
       setLoadingProducts(false);
     }
@@ -230,8 +301,19 @@ export function POSPage() {
   const fetchCustomers = useCallback(async () => {
     try {
       const res = await customerService.list({ search: customerSearch, limit: 12 });
-      setCustomers(res.data?.customers || []);
-    } catch {}
+      const custs = res.data?.customers || [];
+      setCustomers(custs);
+      if (!customerSearch) {
+        masterDataCache.cacheCustomers(custs);
+      }
+    } catch {
+      if (!customerSearch) {
+        const cachedCusts = await masterDataCache.getCachedCustomers();
+        if (cachedCusts && cachedCusts.length > 0) {
+          setCustomers(cachedCusts);
+        }
+      }
+    }
   }, [customerSearch]);
 
   useEffect(() => {
@@ -667,6 +749,48 @@ export function POSPage() {
     }
   };
 
+  const handleCreateCustomer = async (e) => {
+    e.preventDefault();
+    if (!newCustomerForm.name || !newCustomerForm.name.trim()) {
+      setAddCustomerError('Customer Name is required');
+      return;
+    }
+    setSavingCustomer(true);
+    setAddCustomerError('');
+    try {
+      const payload = {
+        name: newCustomerForm.name.trim(),
+        phone: newCustomerForm.phone ? newCustomerForm.phone.trim() : null,
+        customer_type: newCustomerForm.customer_type,
+        address: newCustomerForm.address ? newCustomerForm.address.trim() : null,
+        tax_number: newCustomerForm.tax_number ? newCustomerForm.tax_number.trim() : null
+      };
+
+      const res = await customerService.create(payload);
+      const createdCustomer = res?.data?.customer || res?.customer || res?.data || res;
+
+      await fetchCustomers();
+
+      if (createdCustomer && createdCustomer.id) {
+        handleSelectCustomer(createdCustomer);
+      }
+
+      setNewCustomerForm({
+        name: '',
+        phone: '',
+        customer_type: 'RETAIL',
+        address: '',
+        tax_number: ''
+      });
+      setShowAddCustomerModal(false);
+    } catch (err) {
+      console.error('Failed to create customer:', err);
+      setAddCustomerError(err.response?.data?.error?.message || err.message || 'Failed to create customer');
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
+
   // 6. Hold / Park & Resume Bills
   const handleHoldBill = () => {
     if (cart.length === 0) return;
@@ -713,6 +837,7 @@ export function POSPage() {
   };
 
   const handleResetBilling = () => {
+    cartPersistence.clear();
     setCart([]);
     setSelectedCustomer(null);
     setOrderDiscount(0);
@@ -725,8 +850,9 @@ export function POSPage() {
     if (searchInputRef.current) searchInputRef.current.focus();
   };
 
-  // 7. Complete Sale & Submit Invoice
+  // 7. Complete Sale & Submit Invoice (Online & Offline Support)
   const handleCheckout = async () => {
+    if (loading) return; // Prevent duplicate clicks
     if (cart.length === 0) {
       setError('Please add at least one product item to the invoice.');
       return;
@@ -753,28 +879,66 @@ export function POSPage() {
     setLoading(true);
 
     try {
-      const invoicePayload = {
-        customer_id: selectedCustomer?.id || null,
-        items: cart.map(item => ({
-          product_id: item.product_id,
-          batch_number: item.selected_batch,
-          unit_name: item.unit_name,
-          quantity: item.quantity,
-          free_quantity: 0,
-          unit_price: item.unit_price,
-          discount_percent: 0
-        })),
-        order_discount: orderDisc,
-        payment_mode: effectivePaymentMode,
-        payment_method: effectivePaymentMode === 'SPLIT' ? 'CASH' : effectivePaymentMode,
-        paid_amount: effectivePaymentMode === 'CREDIT' ? 0 : grandTotal,
-        payments: splitPayments
-      };
+      const isSystemOnline = connectionManager.getStatus() === CONNECTION_STATUS.ONLINE;
+      let createdInv = null;
 
-      const res = await invoiceService.create(invoicePayload);
-      const createdInv = res.data?.invoice || res.data?.sale;
+      // 1. If system reports ONLINE, attempt primary server checkout
+      if (isSystemOnline) {
+        try {
+          const idempotencyKey = generateUUID();
+          const invoicePayload = {
+            customer_id: selectedCustomer?.id || null,
+            items: cart.map(item => ({
+              product_id: item.product_id,
+              batch_number: item.selected_batch,
+              unit_name: item.unit_name,
+              quantity: item.quantity,
+              free_quantity: 0,
+              unit_price: item.unit_price,
+              discount_percent: 0
+            })),
+            order_discount: orderDisc,
+            payment_mode: effectivePaymentMode,
+            payment_method: effectivePaymentMode === 'SPLIT' ? 'CASH' : effectivePaymentMode,
+            paid_amount: effectivePaymentMode === 'CREDIT' ? 0 : grandTotal,
+            payments: splitPayments,
+            idempotency_key: idempotencyKey
+          };
+
+          const res = await invoiceService.create(invoicePayload);
+          createdInv = res.data?.invoice || res.data?.sale;
+        } catch (onlineErr) {
+          // If server rejects with validation or auth error (4xx), do not fallback
+          if (onlineErr.response && onlineErr.response.status >= 400 && onlineErr.response.status < 500) {
+            setError(onlineErr.response?.data?.message || 'Invoice processing failed.');
+            setLoading(false);
+            return;
+          }
+          // Server error, database offline, or network disconnect: seamlessly proceed to offline checkout
+          console.warn('[Checkout] Online checkout failed, falling back to offline checkout:', onlineErr);
+          connectionManager.checkHealth();
+        }
+      }
+
+      // 2. Offline Checkout Fallback (or direct offline when disconnected)
+      if (!createdInv) {
+        createdInv = await offlineInvoiceManager.createOfflineInvoice({
+          cart,
+          selectedCustomer,
+          pricingMode,
+          orderDiscount: orderDisc,
+          paymentMode: effectivePaymentMode,
+          splitPayments,
+          cashAmount: cashNum,
+          upiAmount: upiNum,
+          upiRef,
+          creditAmount: creditNum,
+          business,
+          user
+        });
+      }
+
       setSuccessInvoice(createdInv);
-
       fetchProducts();
       handleResetBilling();
     } catch (err) {
@@ -910,7 +1074,7 @@ export function POSPage() {
           TOP HEADER: Invoice ID | Time | Payment Method Toggles | Customer Tier
       ========================================================================= */}
       <header className="no-print bg-[#0B1120] text-white rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-sm border border-[#D4AF37]/30">
-        {/* Left: Invoice ID & Live Time */}
+        {/* Left: Invoice ID, Live Time & Connection Status */}
         <div className="flex items-center gap-3">
           <span className="font-mono font-bold text-sm text-[#D4AF37] tracking-wider">
             {invoiceNumberRef.current}
@@ -919,6 +1083,7 @@ export function POSPage() {
             <Clock className="w-3.5 h-3.5 text-[#D4AF37]" />
             <span>{currentTime}</span>
           </div>
+          <ConnectionBadge />
         </div>
 
         {/* Right: Wholesale vs Retail Tier Switcher & Held Bills */}
@@ -1206,69 +1371,85 @@ export function POSPage() {
         <section className="col-span-12 lg:col-span-7 flex flex-col bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
           {/* Customer Selection Row */}
           <div className="p-2.5 border-b border-slate-200/90 bg-[#FAF5E8]/30 flex items-center justify-between gap-3 shrink-0">
-            <div className="relative flex-1 max-w-sm">
-              {!selectedCustomer ? (
-                <div>
-                  <div className="flex items-center border border-slate-200 rounded-lg bg-white px-2.5 py-1.5 focus-within:border-[#D4AF37] shadow-2xs">
-                    <User className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
-                    <input
-                      type="text"
-                      value={customerSearch}
-                      onChange={(e) => {
-                        setCustomerSearch(e.target.value);
-                        setCustomerDropdownOpen(true);
-                      }}
-                      onFocus={() => setCustomerDropdownOpen(true)}
-                      placeholder="Search Customer (Name or Phone)..."
-                      className="w-full text-xs bg-transparent text-[#0B1120] placeholder-slate-400 focus:outline-none"
-                    />
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1 shrink-0" />
-                  </div>
-
-                  {customerDropdownOpen && customers.length > 0 && (
-                    <div className="absolute left-0 top-full mt-1 w-full bg-white border border-[#D4AF37]/40 rounded-xl shadow-lg z-50 max-h-52 overflow-y-auto py-1">
-                      {customers.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => handleSelectCustomer(c)}
-                          className="w-full text-left px-3 py-2 text-xs hover:bg-[#FAF5E8] border-b border-slate-50 last:border-0 flex items-center justify-between"
-                        >
-                          <div>
-                            <p className="font-bold text-[#0B1120]">{c.name}</p>
-                            <p className="text-[10px] text-slate-500 font-mono">{c.phone || 'Walk-in'}</p>
-                          </div>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#0B1120] text-[#D4AF37]">
-                            {c.customer_type || 'RETAIL'}
-                          </span>
-                        </button>
-                      ))}
+            <div className="flex items-center gap-2 flex-1 max-w-md">
+              <div className="relative flex-1">
+                {!selectedCustomer ? (
+                  <div>
+                    <div className="flex items-center border border-slate-200 rounded-lg bg-white px-2.5 py-1.5 focus-within:border-[#D4AF37] shadow-2xs">
+                      <User className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                      <input
+                        type="text"
+                        value={customerSearch}
+                        onChange={(e) => {
+                          setCustomerSearch(e.target.value);
+                          setCustomerDropdownOpen(true);
+                        }}
+                        onFocus={() => setCustomerDropdownOpen(true)}
+                        placeholder="Search Customer (Name or Phone)..."
+                        className="w-full text-xs bg-transparent text-[#0B1120] placeholder-slate-400 focus:outline-none"
+                      />
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-1 shrink-0" />
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center justify-between bg-white border border-[#D4AF37]/50 rounded-lg px-2.5 py-1 shadow-2xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-[#0B1120]">{selectedCustomer.name}</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#0B1120] text-[#D4AF37]">
-                      {selectedCustomer.customer_type || 'RETAIL'}
-                    </span>
-                    {selectedCustomer.phone && (
-                      <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
-                        ({selectedCustomer.phone})
-                      </span>
+
+                    {customerDropdownOpen && customers.length > 0 && (
+                      <div className="absolute left-0 top-full mt-1 w-full bg-white border border-[#D4AF37]/40 rounded-xl shadow-lg z-50 max-h-52 overflow-y-auto py-1">
+                        {customers.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => handleSelectCustomer(c)}
+                            className="w-full text-left px-3 py-2 text-xs hover:bg-[#FAF5E8] border-b border-slate-50 last:border-0 flex items-center justify-between"
+                          >
+                            <div>
+                              <p className="font-bold text-[#0B1120]">{c.name}</p>
+                              <p className="text-[10px] text-slate-500 font-mono">{c.phone || 'Walk-in'}</p>
+                            </div>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#0B1120] text-[#D4AF37]">
+                              {c.customer_type || 'RETAIL'}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCustomer(null)}
-                    title="Clear Customer"
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center justify-between bg-white border border-[#D4AF37]/50 rounded-lg px-2.5 py-1 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[#0B1120]">{selectedCustomer.name}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#0B1120] text-[#D4AF37]">
+                        {selectedCustomer.customer_type || 'RETAIL'}
+                      </span>
+                      {selectedCustomer.phone && (
+                        <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+                          ({selectedCustomer.phone})
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCustomer(null)}
+                      title="Clear Customer"
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* + Add Customer Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAddCustomerError('');
+                  setShowAddCustomerModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#D4AF37] text-[#0B1120] hover:bg-[#B89326] transition-colors shadow-xs whitespace-nowrap shrink-0 cursor-pointer"
+                title="Add New Customer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Add Customer</span>
+              </button>
             </div>
 
             <div className="flex items-center gap-2 text-xs">
@@ -1623,6 +1804,123 @@ export function POSPage() {
               ))
             )}
           </div>
+        </Modal>
+      )}
+
+      {/* Add Customer Modal */}
+      {showAddCustomerModal && (
+        <Modal
+          isOpen={showAddCustomerModal}
+          onClose={() => {
+            if (!savingCustomer) {
+              setShowAddCustomerModal(false);
+              setAddCustomerError('');
+            }
+          }}
+          title="Add New Customer"
+          size="md"
+        >
+          <form onSubmit={handleCreateCustomer} className="space-y-4">
+            {addCustomerError && (
+              <div className="bg-rose-50 text-rose-700 text-xs px-3 py-2 rounded-lg border border-rose-200">
+                {addCustomerError}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Customer Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={newCustomerForm.name}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="e.g. Ramesh Kumar / Sai Traders"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  value={newCustomerForm.phone}
+                  onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="e.g. 9876543210"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Customer Type <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={newCustomerForm.customer_type}
+                  onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, customer_type: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
+                >
+                  <option value="RETAIL">Retail Customer</option>
+                  <option value="WHOLESALE">Wholesale Customer</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Address
+              </label>
+              <textarea
+                rows={2}
+                value={newCustomerForm.address}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, address: e.target.value }))}
+                placeholder="Shop / House No, Street, City, State..."
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                GSTIN <span className="text-slate-400 font-normal">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                maxLength={15}
+                value={newCustomerForm.tax_number}
+                onChange={(e) => setNewCustomerForm((prev) => ({ ...prev, tax_number: e.target.value.toUpperCase() }))}
+                placeholder="e.g. 33AAAAA0000A1Z5"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] uppercase"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowAddCustomerModal(false);
+                  setAddCustomerError('');
+                }}
+                disabled={savingCustomer}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={savingCustomer}
+                className="bg-[#D4AF37] text-[#0B1120] hover:bg-[#B89326] font-bold"
+              >
+                {savingCustomer ? 'Saving...' : 'Save & Select Customer'}
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

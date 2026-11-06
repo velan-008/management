@@ -395,7 +395,8 @@ export const saleController = {
         payment_status,
         customer_id,
         date_from,
-        date_to
+        date_to,
+        sync_type
       } = req.query;
 
       const offset = (Number(page) - 1) * Number(limit);
@@ -411,6 +412,27 @@ export const saleController = {
         if (date_to) where.invoice_date[Op.lte] = date_to;
       }
 
+      if (sync_type === 'ONLINE') {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: [
+            { notes: null },
+            {
+              [Op.and]: [
+                { notes: { [Op.notLike]: '%Offline POS Bill%' } },
+                { notes: { [Op.notLike]: '%[provisional:OFFLINE-%' } }
+              ]
+            }
+          ]
+        });
+      } else if (sync_type === 'OFFLINE' || sync_type === 'SYNCED') {
+        where[Op.or] = [
+          { notes: { [Op.like]: '%Offline POS Bill%' } },
+          { notes: { [Op.like]: '%[provisional:OFFLINE-%' } },
+          { invoice_number: { [Op.like]: 'OFFLINE-%' } }
+        ];
+      }
+
       const { rows, count } = await Sale.findAndCountAll({
         where,
         include: [
@@ -422,7 +444,25 @@ export const saleController = {
         offset
       });
 
-      return apiResponse.success(res, { sales: rows }, 'Sales retrieved', 200, {
+      const formattedSales = rows.map((sale) => {
+        const item = sale.toJSON();
+        const notes = item.notes || '';
+        const isOffline = notes.includes('Offline POS Bill') ||
+          notes.includes('[provisional:OFFLINE-') ||
+          (item.invoice_number && item.invoice_number.startsWith('OFFLINE-'));
+        const provMatch = notes.match(/\[provisional:(OFFLINE-[^\]]+)\]/);
+        const provisionalNumber = provMatch ? provMatch[1] : (item.invoice_number?.startsWith('OFFLINE-') ? item.invoice_number : null);
+
+        return {
+          ...item,
+          origin: isOffline ? 'OFFLINE' : 'ONLINE',
+          sync_status: isOffline ? 'SYNCED' : 'ONLINE',
+          is_offline: isOffline,
+          provisional_number: provisionalNumber
+        };
+      });
+
+      return apiResponse.success(res, { sales: formattedSales }, 'Sales retrieved', 200, {
         total: count,
         page: Number(page),
         limit: Number(limit),
@@ -448,7 +488,24 @@ export const saleController = {
         ]
       });
       if (!sale) return apiResponse.error(res, 'Sale not found', 404, 'NOT_FOUND');
-      return apiResponse.success(res, { sale }, 'Sale retrieved');
+
+      const item = sale.toJSON();
+      const notes = item.notes || '';
+      const isOffline = notes.includes('Offline POS Bill') ||
+        notes.includes('[provisional:OFFLINE-') ||
+        (item.invoice_number && item.invoice_number.startsWith('OFFLINE-'));
+      const provMatch = notes.match(/\[provisional:(OFFLINE-[^\]]+)\]/);
+      const provisionalNumber = provMatch ? provMatch[1] : (item.invoice_number?.startsWith('OFFLINE-') ? item.invoice_number : null);
+
+      return apiResponse.success(res, {
+        sale: {
+          ...item,
+          origin: isOffline ? 'OFFLINE' : 'ONLINE',
+          sync_status: isOffline ? 'SYNCED' : 'ONLINE',
+          is_offline: isOffline,
+          provisional_number: provisionalNumber
+        }
+      }, 'Sale retrieved');
     } catch (error) {
       next(error);
     }

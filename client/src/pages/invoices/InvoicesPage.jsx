@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Receipt, Search, ChevronLeft, ChevronRight, Eye, CreditCard,
-  RotateCcw, CheckCircle, Clock, AlertCircle, Printer, X
+  RotateCcw, CheckCircle, Clock, AlertCircle, Printer, X, Wifi, WifiOff
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button.jsx';
 import { Badge } from '../../components/ui/Badge.jsx';
@@ -10,6 +10,8 @@ import { saleService, reportService } from '../../services/businessServices.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotification } from '../../context/NotificationContext.jsx';
 import { InvoiceDocument } from '../../components/invoice/InvoiceDocument.jsx';
+import { db } from '../../offline/db.js';
+import { syncManager } from '../../offline/syncManager.js';
 
 const STATUS_CONFIG = {
   COMPLETED: { label: 'Completed', variant: 'success', icon: CheckCircle },
@@ -42,10 +44,54 @@ function SaleDetailModal({ saleId, onClose, onPayment, onRefund }) {
   const [refundLoading, setRefundLoading] = useState(false);
 
   useEffect(() => {
-    saleService.getById(saleId).then((r) => {
-      setSale(r.data.sale);
-      setLoading(false);
-    });
+    let isMounted = true;
+    const loadSale = async () => {
+      try {
+        // First check if saleId matches a local offline invoice (UUID or local_bill_id)
+        const local = await db.offlineInvoices.get(saleId).catch(() => null);
+        if (local && isMounted) {
+          setSale({
+            ...local,
+            id: local.local_bill_id || local.id,
+            origin: 'OFFLINE',
+            sync_status: local.status === 'SYNCED' ? 'SYNCED' : 'PENDING_SYNC',
+            is_offline: local.status !== 'SYNCED'
+          });
+          setLoading(false);
+          return;
+        }
+
+        const r = await saleService.getById(saleId);
+        if (isMounted) {
+          setSale(r.data?.sale || null);
+          setLoading(false);
+        }
+      } catch (err) {
+        // Fallback: check db.offlineInvoices by server_invoice_id or id if server call fails
+        try {
+          const localMatch = await db.offlineInvoices
+            .filter((inv) => inv.server_invoice_id === saleId || inv.id === saleId || inv.local_bill_id === saleId)
+            .first();
+          if (localMatch && isMounted) {
+            setSale({
+              ...localMatch,
+              id: localMatch.local_bill_id || localMatch.id,
+              origin: 'OFFLINE',
+              sync_status: localMatch.status === 'SYNCED' ? 'SYNCED' : 'PENDING_SYNC',
+              is_offline: localMatch.status !== 'SYNCED'
+            });
+          }
+        } catch {
+          // Ignore
+        }
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadSale();
+    return () => {
+      isMounted = false;
+    };
   }, [saleId]);
 
   const handlePayment = async (e) => {
@@ -229,8 +275,26 @@ function SaleDetailModal({ saleId, onClose, onPayment, onRefund }) {
       {/* 1. Modal Top Action Header (no-print) */}
       <div className="no-print flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
+          {sale.sync_status === 'PENDING_SYNC' ? (
+            <Badge variant="warning" className="bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1 font-semibold">
+              <Clock className="w-3 h-3 text-amber-600" /> PENDING SYNC
+            </Badge>
+          ) : sale.origin === 'OFFLINE' || sale.sync_status === 'SYNCED' ? (
+            <Badge variant="info" className="bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1 font-semibold">
+              <CheckCircle className="w-3 h-3 text-blue-600" /> OFFLINE · SYNCED
+            </Badge>
+          ) : (
+            <Badge variant="success" className="bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 font-semibold">
+              <Wifi className="w-3 h-3 text-emerald-600" /> ONLINE
+            </Badge>
+          )}
           <Badge variant={ss.variant}>{ss.label}</Badge>
           <Badge variant={ps.variant}>{ps.label}</Badge>
+          {sale.provisional_number && sale.provisional_number !== sale.invoice_number && (
+            <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              Ref: {sale.provisional_number}
+            </span>
+          )}
           <span className="text-xs text-slate-500 font-mono">
             {sale.invoice_date}
           </span>
@@ -287,8 +351,16 @@ function SaleDetailModal({ saleId, onClose, onPayment, onRefund }) {
         </div>
       </div>
 
+      {/* Pending Sync Offline Notice */}
+      {sale.sync_status === 'PENDING_SYNC' && (
+        <div className="no-print p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
+          <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>This invoice was created offline and is queued for automatic synchronization. Payment adjustments and returns will be available once synced to MySQL.</span>
+        </div>
+      )}
+
       {/* Payment Action */}
-      {sale.payment_status !== 'PAID' && (
+      {sale.payment_status !== 'PAID' && sale.sync_status !== 'PENDING_SYNC' && (
         <div>
           {!showPayForm ? (
             <Button variant="outline" icon={CreditCard} size="sm" onClick={() => setShowPayForm(true)}>
@@ -335,7 +407,7 @@ function SaleDetailModal({ saleId, onClose, onPayment, onRefund }) {
       )}
 
       {/* Return / Refund Action (Admins & Managers) */}
-      {isAdmin && sale.status !== 'REFUNDED' && sale.status !== 'CANCELLED' && (
+      {isAdmin && sale.status !== 'REFUNDED' && sale.status !== 'CANCELLED' && sale.sync_status !== 'PENDING_SYNC' && (
         <div className="pt-2 border-t border-slate-100">
           {!showRefundForm ? (
             <Button
@@ -423,6 +495,7 @@ export function InvoicesPage() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPayStatus, setFilterPayStatus] = useState('');
+  const [filterSyncType, setFilterSyncType] = useState('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
@@ -457,19 +530,183 @@ export function InvoicesPage() {
       if (filterPayStatus) params.payment_status = filterPayStatus;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
+      if (filterSyncType && filterSyncType !== 'ALL') {
+        params.sync_type = filterSyncType;
+      }
 
-      const res = await saleService.list(params);
-      setSales(res.data?.sales || []);
-      setMeta(res.meta || { total: 0, totalPages: 1 });
+      // 1. Fetch pending offline invoices from IndexedDB
+      let localPending = [];
+      try {
+        localPending = await db.offlineInvoices
+          .where('status')
+          .equals('PENDING_SYNC')
+          .toArray();
+      } catch (err) {
+        console.warn('IndexedDB offline invoices read error:', err);
+      }
+
+      // Format local pending bills
+      const formattedPending = localPending.map((p) => ({
+        id: p.local_bill_id || p.id,
+        invoice_number: p.provisional_number || p.invoice_number,
+        provisional_number: p.provisional_number,
+        invoice_date: p.invoice_date || p.created_at?.slice(0, 10),
+        customer: p.customer,
+        grand_total: p.grand_total,
+        paid_amount: p.paid_amount,
+        balance_due: p.balance_due,
+        payment_status: p.payment_status || 'PAID',
+        status: p.status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED',
+        origin: 'OFFLINE',
+        sync_status: 'PENDING_SYNC',
+        is_offline: true,
+        items: p.items,
+        notes: p.notes,
+        created_at: p.created_at
+      }));
+
+      // Apply client filters to pending offline bills
+      const filteredPending = formattedPending.filter((inv) => {
+        if (filterPayStatus && inv.payment_status !== filterPayStatus) return false;
+        if (filterStatus && inv.status !== filterStatus) return false;
+        if (dateFrom && inv.invoice_date < dateFrom) return false;
+        if (dateTo && inv.invoice_date > dateTo) return false;
+        if (search.trim()) {
+          const q = search.trim().toLowerCase();
+          const matchNum = (inv.invoice_number || '').toLowerCase().includes(q);
+          const matchProv = (inv.provisional_number || '').toLowerCase().includes(q);
+          const matchCust = (inv.customer?.name || '').toLowerCase().includes(q);
+          if (!matchNum && !matchProv && !matchCust) return false;
+        }
+        return true;
+      });
+
+      // 2. Fetch server sales
+      let serverSales = [];
+      let serverMeta = { total: 0, totalPages: 1 };
+      let serverAvailable = true;
+
+      try {
+        const res = await saleService.list(params);
+        serverSales = (res.data?.sales || []).map((s) => ({
+          ...s,
+          origin: s.origin || (s.notes?.includes('[provisional:') ? 'OFFLINE' : 'ONLINE'),
+          sync_status: s.sync_status || (s.notes?.includes('[provisional:') ? 'SYNCED' : 'ONLINE'),
+          provisional_number: s.provisional_number || (s.notes?.match(/\[provisional:(OFFLINE-[^\]]+)\]/)?.[1] || null)
+        }));
+        serverMeta = res.meta || { total: serverSales.length, totalPages: 1 };
+      } catch (serverErr) {
+        serverAvailable = false;
+        console.warn('Backend server unreachable, falling back to local IndexedDB:', serverErr);
+      }
+
+      // If server is unreachable, load all records from Dexie IndexedDB
+      if (!serverAvailable) {
+        let allLocal = [];
+        try {
+          allLocal = await db.offlineInvoices.toArray();
+        } catch {}
+
+        const formattedAll = allLocal.map((p) => ({
+          id: p.local_bill_id || p.id,
+          invoice_number: p.invoice_number || p.provisional_number,
+          provisional_number: p.provisional_number,
+          invoice_date: p.invoice_date || p.created_at?.slice(0, 10),
+          customer: p.customer,
+          grand_total: p.grand_total,
+          paid_amount: p.paid_amount,
+          balance_due: p.balance_due,
+          payment_status: p.payment_status || 'PAID',
+          status: p.status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED',
+          origin: 'OFFLINE',
+          sync_status: p.status === 'SYNCED' ? 'SYNCED' : 'PENDING_SYNC',
+          is_offline: p.status !== 'SYNCED',
+          items: p.items,
+          notes: p.notes,
+          created_at: p.created_at
+        }));
+
+        const filtered = formattedAll.filter((inv) => {
+          if (filterSyncType === 'ONLINE') return false;
+          if (filterSyncType === 'PENDING_SYNC' && inv.sync_status !== 'PENDING_SYNC') return false;
+          if (filterSyncType === 'SYNCED' && inv.sync_status !== 'SYNCED') return false;
+          if (filterPayStatus && inv.payment_status !== filterPayStatus) return false;
+          if (filterStatus && inv.status !== filterStatus) return false;
+          if (dateFrom && inv.invoice_date < dateFrom) return false;
+          if (dateTo && inv.invoice_date > dateTo) return false;
+          if (search.trim()) {
+            const q = search.trim().toLowerCase();
+            const matchNum = (inv.invoice_number || '').toLowerCase().includes(q);
+            const matchProv = (inv.provisional_number || '').toLowerCase().includes(q);
+            const matchCust = (inv.customer?.name || '').toLowerCase().includes(q);
+            if (!matchNum && !matchProv && !matchCust) return false;
+          }
+          return true;
+        });
+
+        const total = filtered.length;
+        const totalPages = Math.max(1, Math.ceil(total / 15));
+        const paged = filtered.slice((page - 1) * 15, page * 15);
+        setSales(paged);
+        setMeta({ total, totalPages });
+        return;
+      }
+
+      // If server is available, combine pending local bills with server sales
+      let combined = [];
+      let totalCount = 0;
+
+      if (filterSyncType === 'ONLINE') {
+        combined = serverSales.filter((s) => s.origin === 'ONLINE');
+        totalCount = serverMeta.total;
+      } else if (filterSyncType === 'PENDING_SYNC') {
+        combined = filteredPending;
+        totalCount = filteredPending.length;
+      } else if (filterSyncType === 'SYNCED') {
+        combined = serverSales.filter((s) => s.origin === 'OFFLINE' || s.sync_status === 'SYNCED');
+        totalCount = serverMeta.total;
+      } else if (filterSyncType === 'OFFLINE') {
+        const syncedServer = serverSales.filter((s) => s.origin === 'OFFLINE' || s.sync_status === 'SYNCED');
+        const pendingNotYetOnServer = filteredPending.filter(
+          (p) => !syncedServer.some((s) => s.provisional_number === p.provisional_number)
+        );
+        combined = [...pendingNotYetOnServer, ...syncedServer];
+        totalCount = pendingNotYetOnServer.length + (serverMeta.total || syncedServer.length);
+      } else {
+        // 'ALL'
+        const pendingNotYetOnServer = filteredPending.filter(
+          (p) => !serverSales.some((s) => s.provisional_number === p.provisional_number)
+        );
+        combined = [...pendingNotYetOnServer, ...serverSales];
+        totalCount = pendingNotYetOnServer.length + (serverMeta.total || serverSales.length);
+      }
+
+      setSales(combined);
+      setMeta({
+        total: totalCount,
+        totalPages: Math.max(1, Math.ceil(totalCount / 15))
+      });
     } catch {
       // Non-fatal
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterStatus, filterPayStatus, dateFrom, dateTo]);
+  }, [page, search, filterStatus, filterPayStatus, filterSyncType, dateFrom, dateTo]);
 
   useEffect(() => {
     fetchSales();
+  }, [fetchSales]);
+
+  // Subscribe to automatic synchronization updates
+  useEffect(() => {
+    const unsubscribe = syncManager.subscribe(({ isSyncing }) => {
+      if (!isSyncing) {
+        fetchSales();
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [fetchSales]);
 
   return (
@@ -500,9 +737,23 @@ export function InvoicesPage() {
               setPage(1);
             }}
             className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white"
-            placeholder="Search invoice number..."
+            placeholder="Search invoice or reference number..."
           />
         </div>
+        <select
+          value={filterSyncType}
+          onChange={(e) => {
+            setFilterSyncType(e.target.value);
+            setPage(1);
+          }}
+          className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white cursor-pointer"
+        >
+          <option value="ALL">All Invoices</option>
+          <option value="ONLINE">Online Invoices</option>
+          <option value="OFFLINE">Offline Invoices</option>
+          <option value="PENDING_SYNC">Pending Sync</option>
+          <option value="SYNCED">Synced Invoices</option>
+        </select>
         <select
           value={filterPayStatus}
           onChange={(e) => {
@@ -545,6 +796,7 @@ export function InvoicesPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Invoice</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Date</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Customer</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Type / Sync</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Total</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Paid</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Balance</th>
@@ -557,7 +809,7 @@ export function InvoicesPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 9 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-slate-100 rounded animate-pulse" />
                       </td>
@@ -566,7 +818,7 @@ export function InvoicesPage() {
                 ))
               ) : sales.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center">
+                  <td colSpan={10} className="px-4 py-12 text-center">
                     <Receipt className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                     <p className="text-slate-500">No invoices found</p>
                   </td>
@@ -577,13 +829,38 @@ export function InvoicesPage() {
                   const ss = STATUS_CONFIG[s.status];
                   return (
                     <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-700 font-medium">{s.invoice_number}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-700 font-medium">
+                        <div>{s.invoice_number}</div>
+                        {s.provisional_number && s.provisional_number !== s.invoice_number && (
+                          <div className="text-[10px] text-slate-400 font-normal">
+                            Ref: {s.provisional_number}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-600">{s.invoice_date}</td>
                       <td className="px-4 py-3 text-slate-700">{s.customer?.name || <span className="text-slate-400 italic">Walk-in</span>}</td>
-                      <td className="px-4 py-3 text-right font-semibold font-mono text-slate-900">{currency}{parseFloat(s.grand_total).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-emerald-600">{currency}{parseFloat(s.paid_amount).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center">
+                        {s.sync_status === 'PENDING_SYNC' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-500" />
+                            PENDING SYNC
+                          </span>
+                        ) : s.origin === 'OFFLINE' || s.sync_status === 'SYNCED' ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                            <CheckCircle className="w-3 h-3 text-blue-500" />
+                            SYNCED
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Wifi className="w-3 h-3 text-emerald-500" />
+                            ONLINE
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold font-mono text-slate-900">{currency}{parseFloat(s.grand_total || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-emerald-600">{currency}{parseFloat(s.paid_amount || 0).toFixed(2)}</td>
                       <td className="px-4 py-3 text-right font-mono text-amber-600">
-                        {parseFloat(s.balance_due) > 0 ? `${currency}${parseFloat(s.balance_due).toFixed(2)}` : '—'}
+                        {parseFloat(s.balance_due || 0) > 0 ? `${currency}${parseFloat(s.balance_due || 0).toFixed(2)}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-center"><Badge variant={ps?.variant}>{ps?.label}</Badge></td>
                       <td className="px-4 py-3 text-center"><Badge variant={ss?.variant}>{ss?.label}</Badge></td>
@@ -591,7 +868,8 @@ export function InvoicesPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedSaleId(s.id)}
-                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                          title="View Invoice"
                         >
                           <Eye className="w-4 h-4" />
                         </button>

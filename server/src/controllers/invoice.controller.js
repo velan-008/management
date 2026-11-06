@@ -166,6 +166,15 @@ export const invoiceController = {
         return apiResponse.error(res, 'Invoice not found', 404, 'NOT_FOUND');
       }
 
+      if (invoice.payment_status === 'UNPAID') {
+        const hasPending = (invoice.payments || []).some(
+          (p) => p.notes && p.notes.includes('Pending Confirmation')
+        );
+        if (hasPending) {
+          invoice.setDataValue('payment_status', 'PENDING_CONFIRMATION');
+        }
+      }
+
       return apiResponse.success(res, { invoice }, 'Invoice retrieved successfully');
     } catch (error) {
       next(error);
@@ -525,28 +534,78 @@ export const invoiceController = {
         // 7. Payment Processing & Split Tender
         let calculatedPaid = new Decimal(0);
         let calculatedCredit = new Decimal(0);
+        let unconfirmedDigital = new Decimal(0);
         const paymentRecords = [];
+
+        // Global verified flag if sent in req.body
+        const globalVerified = Boolean(
+          req.body.is_payment_confirmed ||
+          req.body.isPaymentConfirmed ||
+          req.body.paymentConfirmed
+        );
 
         if (Array.isArray(payments) && payments.length > 0) {
           for (const p of payments) {
             const pAmount = new Decimal(p.amount || 0);
             if (pAmount.gt(0)) {
               const method = (p.payment_method || p.method || 'CASH').toUpperCase();
+              const pStatus = (p.status || '').toUpperCase();
+              const isItemConfirmed = Boolean(
+                p.is_confirmed ||
+                p.paymentConfirmed ||
+                p.verified ||
+                (pStatus === 'PAID') ||
+                globalVerified
+              );
+
               if (method === 'CREDIT') {
                 calculatedCredit = calculatedCredit.plus(pAmount);
                 paymentRecords.push({
                   payment_method: 'CREDIT',
                   amount: pAmount.toFixed(2),
-                  reference_number: p.reference_number || null,
+                  reference_number: p.reference_number || p.reference || null,
+                  status: 'OUTSTANDING',
                   notes: p.notes || `Credit payment recorded`
                 });
-              } else {
-                calculatedPaid = calculatedPaid.plus(pAmount);
+              } else if (method === 'UPI' || method === 'CARD') {
+                // A UPI/Card reference number alone must NEVER be treated as verified payment
+                const isConfirmed = isItemConfirmed && pStatus !== 'PENDING_CONFIRMATION';
+                if (isConfirmed) {
+                  calculatedPaid = calculatedPaid.plus(pAmount);
+                } else {
+                  unconfirmedDigital = unconfirmedDigital.plus(pAmount);
+                }
+                const ref = p.reference_number || p.reference || null;
                 paymentRecords.push({
                   payment_method: method,
                   amount: pAmount.toFixed(2),
-                  reference_number: p.reference_number || null,
-                  notes: p.notes || `Split payment via ${method}`
+                  reference_number: ref,
+                  status: isConfirmed ? 'PAID' : 'PENDING_CONFIRMATION',
+                  notes: p.notes || (isConfirmed ? `${method} payment confirmed` : `${method} (Pending Confirmation)`)
+                });
+              } else if (method === 'CASH') {
+                calculatedPaid = calculatedPaid.plus(pAmount);
+                paymentRecords.push({
+                  payment_method: 'CASH',
+                  amount: pAmount.toFixed(2),
+                  reference_number: p.reference_number || p.reference || null,
+                  status: 'PAID',
+                  notes: p.notes || `Cash payment received`
+                });
+              } else {
+                // Other methods (BANK_TRANSFER, CHEQUE)
+                const isConfirmed = isItemConfirmed && pStatus !== 'PENDING_CONFIRMATION';
+                if (isConfirmed) {
+                  calculatedPaid = calculatedPaid.plus(pAmount);
+                } else {
+                  unconfirmedDigital = unconfirmedDigital.plus(pAmount);
+                }
+                paymentRecords.push({
+                  payment_method: method,
+                  amount: pAmount.toFixed(2),
+                  reference_number: p.reference_number || p.reference || null,
+                  status: isConfirmed ? 'PAID' : 'PENDING_CONFIRMATION',
+                  notes: p.notes || `${method} payment`
                 });
               }
             }
@@ -560,16 +619,43 @@ export const invoiceController = {
               payment_method: 'CREDIT',
               amount: grandTotal.toFixed(2),
               reference_number: null,
+              status: 'OUTSTANDING',
               notes: 'Full payment on Credit'
             });
+          } else if (mode === 'UPI' || mode === 'CARD') {
+            const isConfirmed = globalVerified;
+            if (isConfirmed) {
+              const rawPaid = req.body.paid_amount;
+              const directPaid = new Decimal(
+                (rawPaid !== undefined && rawPaid !== null && rawPaid !== '')
+                  ? rawPaid
+                  : grandTotal
+              );
+              calculatedPaid = Decimal.min(directPaid, grandTotal);
+            } else {
+              unconfirmedDigital = grandTotal;
+            }
+            paymentRecords.push({
+              payment_method: mode,
+              amount: grandTotal.toFixed(2),
+              reference_number: req.body.reference_number || req.body.upiRef || req.body.cardRef || null,
+              status: isConfirmed ? 'PAID' : 'PENDING_CONFIRMATION',
+              notes: isConfirmed ? `Full payment via ${mode}` : `${mode} (Pending Confirmation)`
+            });
           } else {
-            const directPaid = new Decimal(paid_amount !== undefined ? paid_amount : grandTotal);
+            const rawPaid = req.body.paid_amount;
+            const directPaid = new Decimal(
+              (rawPaid !== undefined && rawPaid !== null && rawPaid !== '')
+                ? rawPaid
+                : grandTotal
+            );
             calculatedPaid = Decimal.min(directPaid, grandTotal);
             if (calculatedPaid.gt(0)) {
               paymentRecords.push({
-                payment_method: ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER', 'CHEQUE'].includes(mode) ? mode : 'CASH',
+                payment_method: ['CASH', 'BANK_TRANSFER', 'CHEQUE'].includes(mode) ? mode : 'CASH',
                 amount: calculatedPaid.toFixed(2),
                 reference_number: null,
+                status: 'PAID',
                 notes: `Full payment via ${mode}`
               });
             }
@@ -580,21 +666,24 @@ export const invoiceController = {
                 payment_method: 'CREDIT',
                 amount: remainingCredit.toFixed(2),
                 reference_number: null,
+                status: 'OUTSTANDING',
                 notes: 'Balance due on Credit'
               });
             }
           }
         }
 
-        const balanceDue = calculatedCredit;
+        const balanceDue = grandTotal.minus(calculatedPaid);
         let paymentStatus = 'UNPAID';
         if (calculatedPaid.gte(grandTotal) && grandTotal.gt(0)) {
           paymentStatus = 'PAID';
         } else if (calculatedPaid.gt(0)) {
           paymentStatus = 'PARTIALLY_PAID';
+        } else if (unconfirmedDigital.gt(0) && calculatedCredit.isZero()) {
+          paymentStatus = 'PENDING_CONFIRMATION';
         }
 
-        // 8. Credit Limit Validation
+        // 8. Credit Limit Validation (only for explicit CREDIT tender)
         let creditWarning = null;
         if (calculatedCredit.gt(0)) {
           if (!customer) {
@@ -636,6 +725,7 @@ export const invoiceController = {
           : notes;
 
         const primaryMode = (payment_mode || payment_method || 'CASH').toUpperCase();
+        const dbPaymentStatus = (paymentStatus === 'PENDING_CONFIRMATION') ? 'UNPAID' : paymentStatus;
 
         const invoice = await Sale.create(
           {
@@ -660,13 +750,17 @@ export const invoiceController = {
             paid_amount: calculatedPaid.toFixed(2),
             refunded_amount: '0.00',
             balance_due: balanceDue.toFixed(2),
-            payment_status: paymentStatus,
+            payment_status: dbPaymentStatus,
             payment_mode: primaryMode,
             status: 'COMPLETED',
             notes: formattedNotes
           },
           { transaction: t }
         );
+
+        // Keep returned invoice model object consistent with domain payment_status
+        invoice.payment_status = paymentStatus;
+        invoice.setDataValue('payment_status', paymentStatus);
 
         // 10. Bulk insert invoice items
         for (const itemData of invoiceItemsData) {
@@ -750,6 +844,16 @@ export const invoiceController = {
         ]
       });
 
+      if (fullInvoice && fullInvoice.payment_status === 'UNPAID') {
+        const hasPending = (fullInvoice.payments || []).some(
+          (p) => p.notes && p.notes.includes('Pending Confirmation')
+        );
+        if (hasPending) {
+          fullInvoice.setDataValue('payment_status', 'PENDING_CONFIRMATION');
+          fullInvoice.payment_status = 'PENDING_CONFIRMATION';
+        }
+      }
+
       return apiResponse.success(
         res,
         {
@@ -759,6 +863,95 @@ export const invoiceController = {
         },
         'Invoice created and inventory deducted successfully',
         201
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * POST /api/invoices/sync-batch — Idempotent batch synchronization of offline invoices.
+   * Leverages the battle-tested atomic create pipeline with per-bill transaction isolation.
+   */
+  syncBatch: async (req, res, next) => {
+    try {
+      if (!req.user || !req.user.id) {
+        return apiResponse.error(res, 'Authentication required', 401, 'UNAUTHORIZED');
+      }
+
+      const invoices = Array.isArray(req.body.invoices) ? req.body.invoices : [];
+      const results = [];
+
+      for (const invPayload of invoices) {
+        const localBillId = invPayload.local_bill_id || invPayload.idempotency_key;
+        try {
+          const mockReq = {
+            ...req,
+            body: {
+              ...invPayload,
+              idempotency_key: localBillId
+            }
+          };
+
+          let capturedData = null;
+          let capturedStatus = 200;
+          let capturedError = null;
+
+          const mockRes = {
+            status: (code) => {
+              capturedStatus = code;
+              return mockRes;
+            },
+            json: (payload) => {
+              capturedData = payload;
+              return mockRes;
+            }
+          };
+
+          await invoiceController.create(mockReq, mockRes, (err) => {
+            if (err) capturedError = err;
+          });
+
+          if (capturedError) {
+            results.push({
+              local_bill_id: localBillId,
+              status: 'FAILED',
+              error: capturedError.message || 'Invoice synchronization failed'
+            });
+          } else if (capturedData && capturedData.success) {
+            const invoiceObj = capturedData.data?.invoice || capturedData.data?.sale;
+            results.push({
+              local_bill_id: localBillId,
+              status: capturedStatus === 200 ? 'ALREADY_SYNCED' : 'SYNCED',
+              invoice_id: invoiceObj.id,
+              invoice_number: invoiceObj.invoice_number,
+              invoice: invoiceObj
+            });
+          } else {
+            results.push({
+              local_bill_id: localBillId,
+              status: 'FAILED',
+              error: capturedData?.message || 'Invoice synchronization failed'
+            });
+          }
+        } catch (err) {
+          results.push({
+            local_bill_id: localBillId,
+            status: 'FAILED',
+            error: err.message || 'Invoice synchronization failed'
+          });
+        }
+      }
+
+      return apiResponse.success(
+        res,
+        {
+          results,
+          total: invoices.length,
+          synced: results.filter((r) => r.status === 'SYNCED' || r.status === 'ALREADY_SYNCED').length
+        },
+        'Batch synchronization completed',
+        200
       );
     } catch (error) {
       next(error);

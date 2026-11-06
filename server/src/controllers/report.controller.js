@@ -1,5 +1,6 @@
+import { Op } from 'sequelize';
 import { reportService, sanitizeCsvCell } from '../services/report.service.js';
-import { Sale, Product, Expense, Customer, Category } from '../models/index.js';
+import { Sale, Product, Expense, Customer, Category, Supplier, Purchase, Payment, StockMovement } from '../models/index.js';
 import { apiResponse } from '../utils/apiResponse.js';
 
 export const reportController = {
@@ -8,8 +9,9 @@ export const reportController = {
    */
   getDashboard: async (req, res, next) => {
     try {
-      const periodDays = parseInt(req.query.days || '7', 10);
-      const data = await reportService.getDashboardMetrics(req.businessId, periodDays);
+      const { days, date_from, date_to } = req.query;
+      const periodDays = parseInt(days || '7', 10);
+      const data = await reportService.getDashboardMetrics(req.businessId, periodDays, date_from, date_to);
       return apiResponse.success(res, data, 'Dashboard metrics retrieved successfully');
     } catch (error) {
       next(error);
@@ -49,6 +51,66 @@ export const reportController = {
     try {
       const data = await reportService.getInventoryReport(req.businessId);
       return apiResponse.success(res, data, 'Inventory report generated');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * GET /api/reports/payments
+   */
+  getPaymentsReport: async (req, res, next) => {
+    try {
+      const data = await reportService.getPaymentsReport(req.businessId, req.query);
+      return apiResponse.success(res, data, 'Payments report generated');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * GET /api/reports/gst
+   */
+  getGstReport: async (req, res, next) => {
+    try {
+      const data = await reportService.getGstReport(req.businessId, req.query);
+      return apiResponse.success(res, data, 'GST report generated');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * GET /api/reports/customers
+   */
+  getCustomersReport: async (req, res, next) => {
+    try {
+      const data = await reportService.getCustomersReport(req.businessId, req.query);
+      return apiResponse.success(res, data, 'Customers report generated');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * GET /api/reports/suppliers
+   */
+  getSuppliersReport: async (req, res, next) => {
+    try {
+      const data = await reportService.getSuppliersReport(req.businessId, req.query);
+      return apiResponse.success(res, data, 'Suppliers report generated');
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * GET /api/reports/expenses
+   */
+  getExpensesReport: async (req, res, next) => {
+    try {
+      const data = await reportService.getExpensesReport(req.businessId, req.query);
+      return apiResponse.success(res, data, 'Expenses report generated');
     } catch (error) {
       next(error);
     }
@@ -113,8 +175,18 @@ export const reportController = {
           ...rows.map((row) => row.map(sanitizeCsvCell).join(','))
         ].join('\r\n');
       } else if (type === 'expenses') {
+        const { date_from, date_to } = req.query;
+        const where = { business_id: businessId };
+        if (date_from && date_to) {
+          where.expense_date = { [Op.between]: [date_from, date_to] };
+        } else if (date_from) {
+          where.expense_date = { [Op.gte]: date_from };
+        } else if (date_to) {
+          where.expense_date = { [Op.lte]: date_to };
+        }
+
         const expenses = await Expense.findAll({
-          where: { business_id: businessId },
+          where,
           order: [['expense_date', 'DESC']]
         });
 

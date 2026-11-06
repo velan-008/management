@@ -69,7 +69,8 @@ export const saleService = {
 export const invoiceService = {
   list: (params) => api.get('/invoices', { params }),
   getById: (id) => api.get(`/invoices/${id}`),
-  create: (data) => api.post('/invoices', data)
+  create: (data) => api.post('/invoices', data),
+  syncBatch: (data) => api.post('/invoices/sync-batch', data)
 };
 
 export const expenseService = {
@@ -117,6 +118,11 @@ export const reportService = {
   getProfitLoss: (params) => api.get('/reports/profit-loss', { params }),
   getSalesSummary: (params) => api.get('/reports/sales-summary', { params }),
   getInventory: () => api.get('/reports/inventory'),
+  getPayments: (params) => api.get('/reports/payments', { params }),
+  getExpenses: (params) => api.get('/reports/expenses', { params }),
+  getGstReport: (params) => api.get('/reports/gst', { params }),
+  getCustomersReport: (params) => api.get('/reports/customers', { params }),
+  getSuppliersReport: (params) => api.get('/reports/suppliers', { params }),
   exportCsvUrl: (type) => `/api/reports/export/${type}`,
   exportCsv: async (type) => {
     const token = localStorage.getItem('token');

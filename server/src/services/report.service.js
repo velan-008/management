@@ -1,6 +1,6 @@
 import { Op, Sequelize } from 'sequelize';
 import {
-  Sale, SaleItem, Product, Customer, Expense, User, StockMovement, Supplier, Purchase, Payment
+  Sale, SaleItem, Product, Customer, Expense, User, StockMovement, Supplier, Purchase, Payment, Business
 } from '../models/index.js';
 
 /**
@@ -23,11 +23,24 @@ export const reportService = {
   /**
    * Generates real-time dashboard KPIs computed directly from database records
    */
-  getDashboardMetrics: async (businessId, periodDays = 7) => {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - (periodDays - 1));
-    startDate.setHours(0, 0, 0, 0);
-    const startDateStr = startDate.toISOString().split('T')[0];
+  getDashboardMetrics: async (businessId, periodDays = 7, dateFrom = null, dateTo = null) => {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let startDateStr;
+    let endDateStr;
+
+    if (dateFrom && dateTo) {
+      // Disallow future dates and ensure proper range
+      endDateStr = dateTo > todayStr ? todayStr : dateTo;
+      startDateStr = dateFrom > endDateStr ? endDateStr : dateFrom;
+    } else {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - (periodDays - 1));
+      startDate.setHours(0, 0, 0, 0);
+      startDateStr = startDate.toISOString().split('T')[0];
+      endDateStr = todayStr;
+    }
 
     // 1. Fetch completed or partially refunded sales for business
     const sales = await Sale.findAll({
@@ -45,8 +58,8 @@ export const reportService = {
       ]
     });
 
-    // Filter sales and expenses for the selected period (e.g. Last 7 Days, 14 Days, 30 Days)
-    const periodSales = sales.filter((s) => s.invoice_date >= startDateStr);
+    // Filter sales and expenses for the selected period (e.g. Last 7 Days, 14 Days, 30 Days, or custom date range)
+    const periodSales = sales.filter((s) => s.invoice_date >= startDateStr && s.invoice_date <= endDateStr);
 
     let periodRevenue = 0;
     let periodTaxCollected = 0;
@@ -89,7 +102,7 @@ export const reportService = {
       where: { business_id: businessId }
     });
 
-    const periodExpenses = expenses.filter((e) => e.expense_date >= startDateStr);
+    const periodExpenses = expenses.filter((e) => e.expense_date >= startDateStr && e.expense_date <= endDateStr);
     const periodTotalExpenses = periodExpenses.reduce(
       (sum, exp) => sum + (parseFloat(exp.amount) || 0),
       0
@@ -118,12 +131,13 @@ export const reportService = {
       limit: 10
     });
 
-    // 4. Last N-day daily trend
+    // 4. Daily trend for the selected period
     const salesLastDays = await Sale.findAll({
       where: {
         business_id: businessId,
         invoice_date: {
-          [Op.gte]: startDate.toISOString().split('T')[0]
+          [Op.gte]: startDateStr,
+          [Op.lte]: endDateStr
         },
         status: {
           [Op.in]: ['COMPLETED', 'PARTIALLY_REFUNDED', 'REFUNDED']
@@ -135,12 +149,30 @@ export const reportService = {
 
     // Bucket sales by date
     const trendMap = {};
-    for (let i = periodDays - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-      trendMap[dateStr] = { date: dateStr, label, sales: 0, orders: 0 };
+    if (dateFrom && dateTo) {
+      const [sYear, sMonth, sDay] = startDateStr.split('-').map(Number);
+      const [eYear, eMonth, eDay] = endDateStr.split('-').map(Number);
+      const curr = new Date(sYear, sMonth - 1, sDay);
+      const end = new Date(eYear, eMonth - 1, eDay);
+      let safetyCounter = 0;
+      while (curr <= end && safetyCounter < 366) {
+        const y = curr.getFullYear();
+        const m = String(curr.getMonth() + 1).padStart(2, '0');
+        const d = String(curr.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${d}`;
+        const label = curr.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        trendMap[dateStr] = { date: dateStr, label, sales: 0, orders: 0 };
+        curr.setDate(curr.getDate() + 1);
+        safetyCounter++;
+      }
+    } else {
+      for (let i = periodDays - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        trendMap[dateStr] = { date: dateStr, label, sales: 0, orders: 0 };
+      }
     }
 
     for (const s of salesLastDays) {
@@ -257,16 +289,20 @@ export const reportService = {
     })) || 0;
     const totalSupplierOutstanding = Math.max(supplierBalanceSum, parseFloat(purchaseBalanceSum) || 0);
 
-    // Payment collection breakdown (for the selected period)
+    // Payment collection breakdown (for the selected period based on actual records)
+    const paymentWhere = {
+      business_id: businessId
+    };
+    if (startDateStr && endDateStr) {
+      paymentWhere[Op.and] = [
+        Sequelize.where(Sequelize.fn('DATE', Sequelize.col('payment_date')), {
+          [Op.between]: [startDateStr, endDateStr]
+        })
+      ];
+    }
     const periodPayments = await Payment.findAll({
-      where: {
-        business_id: businessId,
-        payment_date: {
-          [Op.gte]: startDate
-        }
-      }
+      where: paymentWhere
     });
-    const paymentsToCount = periodPayments.length > 0 ? periodPayments : await Payment.findAll({ where: { business_id: businessId } });
     const paymentCollections = {
       CASH: 0,
       UPI: 0,
@@ -274,10 +310,33 @@ export const reportService = {
       BANK_TRANSFER: 0,
       OTHER: 0
     };
-    for (const p of paymentsToCount) {
-      const meth = p.payment_method || 'CASH';
-      paymentCollections[meth] = (paymentCollections[meth] || 0) + (parseFloat(p.amount) || 0);
+    for (const p of periodPayments) {
+      const meth = (p.payment_method || 'CASH').toUpperCase();
+      const amt = parseFloat(p.amount) || 0;
+      if (meth === 'CREDIT') {
+        continue; // CREDIT tender represents trade receivable, not cash/bank receipt
+      }
+      if (paymentCollections[meth] !== undefined) {
+        paymentCollections[meth] += amt;
+      } else {
+        paymentCollections.OTHER += amt;
+      }
     }
+    for (const k of Object.keys(paymentCollections)) {
+      paymentCollections[k] = Math.round(paymentCollections[k] * 100) / 100;
+    }
+
+    // Purchases for the selected period
+    const purchasesPeriod = await Purchase.findAll({
+      where: {
+        business_id: businessId,
+        purchase_date: {
+          [Op.between]: [startDateStr, endDateStr]
+        },
+        status: { [Op.ne]: 'CANCELLED' }
+      }
+    });
+    const periodPurchases = purchasesPeriod.reduce((sum, p) => sum + (parseFloat(p.grand_total) || 0), 0);
 
     // Recent purchases
     const recentPurchases = await Purchase.findAll({
@@ -303,6 +362,7 @@ export const reportService = {
         lowStockCount: lowStockProducts.length,
         periodDays,
         // Wholesale extensions
+        periodPurchases: Math.round(periodPurchases * 100) / 100,
         todaySales: Math.round(todaySales * 100) / 100,
         todayBillsCount,
         todayPurchases: Math.round(todayPurchases * 100) / 100,
@@ -422,7 +482,10 @@ export const reportService = {
    * Aggregated sales summary report
    */
   getSalesSummary: async (businessId, dateFrom, dateTo) => {
-    const where = { business_id: businessId };
+    const where = {
+      business_id: businessId,
+      status: { [Op.in]: ['COMPLETED', 'PARTIALLY_REFUNDED', 'REFUNDED'] }
+    };
     if (dateFrom || dateTo) {
       where.invoice_date = {};
       if (dateFrom) where.invoice_date[Op.gte] = dateFrom;
@@ -503,6 +566,465 @@ export const reportService = {
       potentialProfit: Math.round(potentialProfit * 100) / 100,
       lowStockCount,
       outOfStockCount
+    };
+  },
+
+  /**
+   * Payments collection register report
+   */
+  getPaymentsReport: async (businessId, query = {}) => {
+    const { page = 1, limit = 20, date_from, date_to, payment_method, search = '' } = query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
+
+    const where = { business_id: businessId };
+    if (payment_method && payment_method !== 'ALL') {
+      where.payment_method = payment_method;
+    }
+    if (date_from && date_to) {
+      where[Op.and] = [
+        Sequelize.where(Sequelize.fn('DATE', Sequelize.col('Payment.payment_date')), {
+          [Op.between]: [date_from, date_to]
+        })
+      ];
+    } else if (date_from) {
+      where[Op.and] = [
+        Sequelize.where(Sequelize.fn('DATE', Sequelize.col('Payment.payment_date')), {
+          [Op.gte]: date_from
+        })
+      ];
+    } else if (date_to) {
+      where[Op.and] = [
+        Sequelize.where(Sequelize.fn('DATE', Sequelize.col('Payment.payment_date')), {
+          [Op.lte]: date_to
+        })
+      ];
+    }
+
+    if (search && search.trim()) {
+      where[Op.or] = [
+        { reference_number: { [Op.like]: `%${search.trim()}%` } },
+        { notes: { [Op.like]: `%${search.trim()}%` } }
+      ];
+    }
+
+    const { count, rows } = await Payment.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Sale,
+          as: 'sale',
+          attributes: ['id', 'invoice_number', 'invoice_date', 'customer_id'],
+          include: [
+            {
+              model: Customer,
+              as: 'customer',
+              attributes: ['id', 'name', 'phone']
+            }
+          ]
+        }
+      ],
+      order: [['payment_date', 'DESC'], ['id', 'DESC']],
+      limit: limitNum,
+      offset
+    });
+
+    const allFiltered = await Payment.findAll({
+      where,
+      attributes: ['payment_method', 'amount']
+    });
+
+    let totalAmount = 0;
+    const byMethod = { CASH: 0, UPI: 0, CARD: 0, BANK_TRANSFER: 0, CREDIT: 0, OTHER: 0 };
+    for (const p of allFiltered) {
+      const amt = parseFloat(p.amount) || 0;
+      totalAmount += amt;
+      const m = (p.payment_method || 'OTHER').toUpperCase();
+      if (byMethod[m] !== undefined) byMethod[m] += amt;
+      else byMethod.OTHER += amt;
+    }
+
+    return {
+      payments: rows,
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(count / limitNum)
+      },
+      summary: {
+        totalAmount: Math.round(totalAmount * 100) / 100,
+        byMethod
+      }
+    };
+  },
+
+  /**
+   * Statutory GST report with CGST, SGST, IGST breakdown
+   */
+  getGstReport: async (businessId, query = {}) => {
+    const { page = 1, limit = 20, date_from, date_to, search = '' } = query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
+
+    const where = {
+      business_id: businessId,
+      status: { [Op.in]: ['COMPLETED', 'PARTIALLY_REFUNDED', 'REFUNDED'] }
+    };
+
+    if (date_from && date_to) {
+      where.invoice_date = { [Op.between]: [date_from, date_to] };
+    } else if (date_from) {
+      where.invoice_date = { [Op.gte]: date_from };
+    } else if (date_to) {
+      where.invoice_date = { [Op.lte]: date_to };
+    }
+
+    if (search && search.trim()) {
+      where.invoice_number = { [Op.like]: `%${search.trim()}%` };
+    }
+
+    const { count, rows } = await Sale.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Customer,
+          as: 'customer',
+          attributes: ['id', 'name', 'tax_number', 'state', 'phone'],
+          required: false
+        },
+        {
+          model: Business,
+          as: 'business',
+          attributes: ['id', 'name', 'state', 'tax_number'],
+          required: false
+        }
+      ],
+      order: [['invoice_date', 'DESC'], ['id', 'DESC']],
+      limit: limitNum,
+      offset
+    });
+
+    const allFiltered = await Sale.findAll({
+      where,
+      attributes: ['subtotal', 'discount_total', 'tax_total', 'cgst_total', 'sgst_total', 'igst_total', 'grand_total', 'refunded_amount']
+    });
+
+    let totalTaxable = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
+    let totalTax = 0;
+    let totalInvoiceAmount = 0;
+
+    for (const s of allFiltered) {
+      const sub = parseFloat(s.subtotal) || 0;
+      const disc = parseFloat(s.discount_total) || 0;
+      totalTaxable += Math.max(0, sub - disc);
+      totalCgst += parseFloat(s.cgst_total) || 0;
+      totalSgst += parseFloat(s.sgst_total) || 0;
+      totalIgst += parseFloat(s.igst_total) || 0;
+      totalTax += parseFloat(s.tax_total) || 0;
+      totalInvoiceAmount += (parseFloat(s.grand_total) || 0) - (parseFloat(s.refunded_amount) || 0);
+    }
+
+    return {
+      records: rows.map(s => {
+        const sub = parseFloat(s.subtotal) || 0;
+        const disc = parseFloat(s.discount_total) || 0;
+        const taxable = Math.max(0, sub - disc);
+        const isInterState = parseFloat(s.igst_total || 0) > 0;
+        return {
+          id: s.id,
+          invoice_number: s.invoice_number,
+          invoice_date: s.invoice_date,
+          customer_name: s.customer ? s.customer.name : 'Walk-in Customer',
+          customer_gstin: s.customer ? (s.customer.tax_number || 'URP') : 'URP',
+          place_of_supply: s.customer?.state || s.business?.state || 'Local',
+          transaction_type: isInterState ? 'Inter-State (IGST)' : 'Intra-State (CGST+SGST)',
+          taxable_amount: Math.round(taxable * 100) / 100,
+          cgst_amount: parseFloat(s.cgst_total) || 0,
+          sgst_amount: parseFloat(s.sgst_total) || 0,
+          igst_amount: parseFloat(s.igst_total) || 0,
+          tax_amount: parseFloat(s.tax_total) || 0,
+          grand_total: parseFloat(s.grand_total) || 0
+        };
+      }),
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(count / limitNum)
+      },
+      summary: {
+        totalTaxable: Math.round(totalTaxable * 100) / 100,
+        totalCgst: Math.round(totalCgst * 100) / 100,
+        totalSgst: Math.round(totalSgst * 100) / 100,
+        totalIgst: Math.round(totalIgst * 100) / 100,
+        totalTax: Math.round(totalTax * 100) / 100,
+        totalInvoiceAmount: Math.round(totalInvoiceAmount * 100) / 100
+      }
+    };
+  },
+
+  /**
+   * Customer receivables & sales report
+   */
+  getCustomersReport: async (businessId, query = {}) => {
+    const { page = 1, limit = 20, search = '', customer_type } = query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
+
+    const where = { business_id: businessId };
+    if (customer_type && customer_type !== 'ALL') where.customer_type = customer_type;
+    if (search && search.trim()) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${search.trim()}%` } },
+        { phone: { [Op.like]: `%${search.trim()}%` } }
+      ];
+    }
+
+    const { count, rows } = await Customer.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Sale,
+          as: 'sales',
+          attributes: ['id', 'grand_total', 'paid_amount', 'balance_due', 'status'],
+          where: { status: { [Op.ne]: 'CANCELLED' } },
+          required: false
+        }
+      ],
+      order: [['name', 'ASC']],
+      limit: limitNum,
+      offset
+    });
+
+    const records = rows.map(c => {
+      const sales = c.sales || [];
+      const totalSalesAmt = sales.reduce((sum, s) => sum + (parseFloat(s.grand_total) || 0), 0);
+      const totalPaid = sales.reduce((sum, s) => sum + (parseFloat(s.paid_amount) || 0), 0);
+      const currentOutstanding = parseFloat(c.outstanding_balance) || 0;
+      const creditLimit = parseFloat(c.credit_limit) || 0;
+      let status = 'GOOD';
+      if (creditLimit > 0 && currentOutstanding >= creditLimit) status = 'OVER_LIMIT';
+      else if (creditLimit > 0 && currentOutstanding >= creditLimit * 0.8) status = 'NEAR_LIMIT';
+
+      return {
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        email: c.email,
+        customer_type: c.customer_type,
+        state: c.state || '-',
+        credit_limit: creditLimit,
+        outstanding_balance: currentOutstanding,
+        total_invoices: sales.length,
+        total_sales_amount: Math.round(totalSalesAmt * 100) / 100,
+        total_paid: Math.round(totalPaid * 100) / 100,
+        credit_status: status
+      };
+    });
+
+    const allCustomers = await Customer.findAll({
+      where: { business_id: businessId },
+      attributes: ['outstanding_balance', 'credit_limit']
+    });
+    const totalOutstanding = allCustomers.reduce((sum, c) => sum + (parseFloat(c.outstanding_balance) || 0), 0);
+    const overLimitCount = allCustomers.filter(c => parseFloat(c.credit_limit) > 0 && parseFloat(c.outstanding_balance) >= parseFloat(c.credit_limit)).length;
+
+    return {
+      customers: records,
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(count / limitNum)
+      },
+      summary: {
+        totalCustomers: count,
+        totalOutstanding: Math.round(totalOutstanding * 100) / 100,
+        overLimitCount
+      }
+    };
+  },
+
+  /**
+   * Supplier payables & purchases report
+   */
+  getSuppliersReport: async (businessId, query = {}) => {
+    const { page = 1, limit = 20, search = '' } = query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
+
+    const where = { business_id: businessId };
+    if (search && search.trim()) {
+      where[Op.or] = [
+        { name: { [Op.like]: `%${search.trim()}%` } },
+        { contact_person: { [Op.like]: `%${search.trim()}%` } },
+        { phone: { [Op.like]: `%${search.trim()}%` } },
+        { tax_number: { [Op.like]: `%${search.trim()}%` } }
+      ];
+    }
+
+    const { count, rows } = await Supplier.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Purchase,
+          as: 'purchases',
+          attributes: ['id', 'grand_total', 'paid_amount', 'balance_due', 'status'],
+          where: { status: { [Op.ne]: 'CANCELLED' } },
+          required: false
+        }
+      ],
+      order: [['name', 'ASC']],
+      limit: limitNum,
+      offset
+    });
+
+    const records = rows.map(s => {
+      const purchases = s.purchases || [];
+      const totalPurchaseAmt = purchases.reduce((sum, p) => sum + (parseFloat(p.grand_total) || 0), 0);
+      const totalPaid = purchases.reduce((sum, p) => sum + (parseFloat(p.paid_amount) || 0), 0);
+      const outstanding = parseFloat(s.outstanding_balance) || 0;
+
+      return {
+        id: s.id,
+        name: s.name,
+        contact_person: s.contact_person,
+        phone: s.phone,
+        email: s.email,
+        gstin: s.tax_number || '-',
+        total_purchases_count: purchases.length,
+        total_purchases_amount: Math.round(totalPurchaseAmt * 100) / 100,
+        total_paid: Math.round(totalPaid * 100) / 100,
+        outstanding_balance: outstanding
+      };
+    });
+
+    const allSuppliers = await Supplier.findAll({
+      where: { business_id: businessId },
+      attributes: ['outstanding_balance']
+    });
+    const totalPayables = allSuppliers.reduce((sum, s) => sum + (parseFloat(s.outstanding_balance) || 0), 0);
+
+    return {
+      suppliers: records,
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(count / limitNum)
+      },
+      summary: {
+        totalSuppliers: count,
+        totalPayables: Math.round(totalPayables * 100) / 100
+      }
+    };
+  },
+
+  /**
+   * Operating Expenses Register & Breakdown Report
+   */
+  getExpensesReport: async (businessId, query = {}) => {
+    const { page = 1, limit = 20, date_from, date_to, category, payment_method, search = '' } = query;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+    const offset = (pageNum - 1) * limitNum;
+
+    const where = { business_id: businessId };
+
+    if (category && category !== 'ALL') {
+      where.category = category;
+    }
+    if (payment_method && payment_method !== 'ALL') {
+      where.payment_method = payment_method;
+    }
+
+    if (date_from && date_to) {
+      where.expense_date = { [Op.between]: [date_from, date_to] };
+    } else if (date_from) {
+      where.expense_date = { [Op.gte]: date_from };
+    } else if (date_to) {
+      where.expense_date = { [Op.lte]: date_to };
+    }
+
+    if (search && search.trim()) {
+      const q = `%${search.trim()}%`;
+      where[Op.or] = [
+        { description: { [Op.like]: q } },
+        { category: { [Op.like]: q } }
+      ];
+    }
+
+    const { count, rows } = await Expense.findAndCountAll({
+      where,
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'name', 'email']
+        }
+      ],
+      order: [['expense_date', 'DESC'], ['id', 'DESC']],
+      limit: limitNum,
+      offset
+    });
+
+    // Compute accurate totals across ALL matching records (not just the current page)
+    const allFiltered = await Expense.findAll({
+      where,
+      attributes: ['category', 'amount', 'payment_method']
+    });
+
+    let totalExpenses = 0;
+    const categoryTotals = {};
+    const methodTotals = {};
+
+    for (const exp of allFiltered) {
+      const amt = parseFloat(exp.amount) || 0;
+      totalExpenses += amt;
+
+      const cat = exp.category || 'Other';
+      categoryTotals[cat] = (categoryTotals[cat] || 0) + amt;
+
+      const method = exp.payment_method || 'CASH';
+      methodTotals[method] = (methodTotals[method] || 0) + amt;
+    }
+
+    let highestCategory = 'None';
+    let highestCategoryAmount = 0;
+    for (const [cat, amt] of Object.entries(categoryTotals)) {
+      if (amt > highestCategoryAmount) {
+        highestCategoryAmount = amt;
+        highestCategory = cat;
+      }
+    }
+
+    const avgExpense = allFiltered.length > 0 ? (totalExpenses / allFiltered.length) : 0;
+
+    return {
+      expenses: rows,
+      pagination: {
+        total: count,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(count / limitNum)
+      },
+      summary: {
+        totalExpenses: Math.round(totalExpenses * 100) / 100,
+        totalCount: count,
+        avgExpense: Math.round(avgExpense * 100) / 100,
+        highestCategory,
+        highestCategoryAmount: Math.round(highestCategoryAmount * 100) / 100,
+        categoryTotals,
+        methodTotals
+      }
     };
   }
 };

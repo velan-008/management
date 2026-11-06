@@ -76,9 +76,12 @@ export function InvoiceDocument({
   const balanceDueVal = parseFloat(invoice.balance_due || 0);
   const customerLedgerBalance = parseFloat(customerObj.outstanding_balance || 0);
 
-  // GST & Supply Classification
+  // GST & Supply Classification & Offline Status
+  const isOffline = Boolean(invoice.is_offline || invoice.status === 'PENDING_SYNC' || (invoice.provisional_number && !invoice.server_invoice_number && !invoice.id));
   const isGstInvoice = taxTotalVal > 0 || (invoice.items || []).some(it => parseFloat(it.tax_rate || 0) > 0);
-  const invoiceTypeTitle = isGstInvoice ? 'TAX INVOICE' : 'BILL OF SUPPLY';
+  const invoiceTypeTitle = isOffline
+    ? 'PROVISIONAL OFFLINE BILL'
+    : (isGstInvoice ? 'TAX INVOICE' : 'BILL OF SUPPLY');
 
   const isInterState = parseFloat(invoice.igst_total || 0) > 0 || (
     Boolean(customerState && businessState) &&
@@ -172,6 +175,8 @@ export function InvoiceDocument({
       ? 'PAID'
       : paymentStatus === 'PARTIALLY_PAID'
       ? 'PARTIALLY PAID'
+      : paymentStatus === 'PENDING_CONFIRMATION'
+      ? 'PENDING CONFIRMATION'
       : 'UNPAID / ON CREDIT';
 
   const amountInWords = numberToWords(grandTotalVal);
@@ -211,10 +216,21 @@ export function InvoiceDocument({
 
           {/* Invoice & Customer Meta */}
           <div className="py-1.5 border-b border-dashed border-slate-400 space-y-0.5 text-[10px]">
+            {isOffline && (
+              <div className="mb-1 p-1 bg-amber-50 border border-dashed border-amber-400 text-amber-900 text-center text-[9px] font-bold">
+                * PROVISIONAL OFFLINE BILL — PENDING SYNC *
+              </div>
+            )}
             <div className="flex justify-between">
-              <span className="font-semibold text-slate-600">Invoice No:</span>
-              <span className="font-bold font-mono text-slate-900">{invoiceNumber}</span>
+              <span className="font-semibold text-slate-600">{isOffline ? 'Provisional Ref:' : 'Invoice No:'}</span>
+              <span className="font-bold font-mono text-slate-900">{isOffline ? (invoice.provisional_number || invoiceNumber) : invoiceNumber}</span>
             </div>
+            {invoice.provisional_number && !isOffline && (
+              <div className="flex justify-between text-[9px] text-slate-500">
+                <span>(Offline Ref):</span>
+                <span className="font-mono">{invoice.provisional_number}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="font-semibold text-slate-600">Date & Time:</span>
               <span>{formattedDate} {formattedTime}</span>
@@ -343,7 +359,7 @@ export function InvoiceDocument({
               <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${
                 paymentStatus === 'PAID'
                   ? 'bg-emerald-100 text-emerald-800'
-                  : paymentStatus === 'PARTIALLY_PAID'
+                  : (paymentStatus === 'PARTIALLY_PAID' || paymentStatus === 'PENDING_CONFIRMATION')
                   ? 'bg-amber-100 text-amber-800'
                   : 'bg-rose-100 text-rose-800'
               }`}>
@@ -352,7 +368,11 @@ export function InvoiceDocument({
             </div>
             {paymentsList.map((pm, i) => (
               <div key={i} className="flex justify-between text-slate-700">
-                <span>{pm.payment_method || 'CASH'}{pm.reference_number ? ` (Ref:${pm.reference_number})` : ''}:</span>
+                <span>
+                  {(pm.payment_method || pm.method || 'CASH')}
+                  {pm.reference_number ? ` (Ref:${pm.reference_number})` : ''}
+                  {pm.status === 'PENDING_CONFIRMATION' ? ' [Pending]' : ''}:
+                </span>
                 <span className="font-mono font-semibold">{currency}{parseFloat(pm.amount || 0).toFixed(2)}</span>
               </div>
             ))}
@@ -423,7 +443,15 @@ export function InvoiceDocument({
                 </p>
               </div>
               <div className="mt-2 text-right space-y-0.5 font-mono text-[11px]">
-                <p>Invoice No: <strong className="text-slate-900 text-xs">{invoiceNumber}</strong></p>
+                {isOffline && (
+                  <p className="text-amber-700 font-sans font-bold text-[10px] bg-amber-50 border border-amber-200 px-1 py-0.5 rounded">
+                    PROVISIONAL BILL (OFFLINE)
+                  </p>
+                )}
+                <p>{isOffline ? 'Provisional Ref:' : 'Invoice No:'} <strong className="text-slate-900 text-xs">{isOffline ? (invoice.provisional_number || invoiceNumber) : invoiceNumber}</strong></p>
+                {invoice.provisional_number && !isOffline && (
+                  <p className="text-[10px] text-slate-500">Offline Ref: <span>{invoice.provisional_number}</span></p>
+                )}
                 <p className="text-slate-600">Date: <strong className="text-slate-800">{formattedDate}</strong></p>
                 <p className="text-slate-600">Time: <span>{formattedTime}</span></p>
                 <p className="text-slate-600">Mode: <strong className="text-slate-800">{invoice.payment_mode || 'CASH'}</strong></p>
@@ -471,7 +499,7 @@ export function InvoiceDocument({
                 <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
                   paymentStatus === 'PAID'
                     ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                    : paymentStatus === 'PARTIALLY_PAID'
+                    : (paymentStatus === 'PARTIALLY_PAID' || paymentStatus === 'PENDING_CONFIRMATION')
                     ? 'bg-amber-100 text-amber-800 border-amber-300'
                     : 'bg-rose-100 text-rose-800 border-rose-300'
                 }`}>
@@ -634,8 +662,9 @@ export function InvoiceDocument({
                   return (
                     <div key={i} className="flex justify-between font-mono text-slate-700 max-w-sm text-[10px]">
                       <span>
-                        <strong className="text-slate-900">{pm.payment_method || 'CASH'}</strong>
+                        <strong className="text-slate-900">{pm.payment_method || pm.method || 'CASH'}</strong>
                         {pm.reference_number ? ` (${pm.reference_number})` : ''}
+                        {pm.status === 'PENDING_CONFIRMATION' ? ' [Pending Confirmation]' : ''}
                         {dateStr ? ` · ${dateStr}` : ''}:
                       </span>
                       <span className="font-bold text-slate-900">{currency}{parseFloat(pm.amount || 0).toFixed(2)}</span>
