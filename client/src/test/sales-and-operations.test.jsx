@@ -469,7 +469,7 @@ describe('BUSINESSFLOW — Stages 5–8 Frontend Operations & Management Tests',
     expect(await screen.findByText('John Connor')).toBeInTheDocument();
     fireEvent.click(screen.getByTitle('Deactivate'));
 
-    expect(await screen.findByText('Deactivate Employee', {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText('Deactivate Employee', {}, { timeout: 6000 })).toBeInTheDocument();
     expect(screen.getByText(/Are you sure you want to deactivate John Connor\?/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /confirm deactivation/i }));

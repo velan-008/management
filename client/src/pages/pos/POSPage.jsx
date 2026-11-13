@@ -11,6 +11,7 @@ import { productService, customerService, invoiceService } from '../../services/
 import { useAuth } from '../../context/AuthContext.jsx';
 import { formatCurrency as formatCur } from '../../utils/formatters.js';
 import { InvoiceDocument } from '../../components/invoice/InvoiceDocument.jsx';
+import { executeDirectPrint } from '../../utils/printUtils.js';
 import { ConnectionBadge } from '../../components/pos/ConnectionBadge.jsx';
 import { masterDataCache } from '../../offline/masterDataCache.js';
 import { cartPersistence } from '../../offline/cartPersistence.js';
@@ -949,123 +950,7 @@ export function POSPage() {
   };
 
   const handlePrintReceipt = () => {
-    const invoiceEl = document.getElementById('invoice-print-area');
-    if (!invoiceEl) return;
-
-    // 1. Clean up any previous direct print container
-    let directContainer = document.getElementById('invoice-print-direct-container');
-    if (directContainer) {
-      directContainer.remove();
-    }
-
-    // 2. Create dedicated direct print container mounted directly on document.body
-    directContainer = document.createElement('div');
-    directContainer.id = 'invoice-print-direct-container';
-    directContainer.appendChild(invoiceEl.cloneNode(true));
-    document.body.appendChild(directContainer);
-
-    // 3. Inject print styles with dynamic @page sizing and strict isolation
-    let style = document.getElementById('print-page-style');
-    if (!style) {
-      style = document.createElement('style');
-      style.id = 'print-page-style';
-      document.head.appendChild(style);
-    }
-
-    const isThermal = printLayout === 'thermal';
-    const pageRule = isThermal
-      ? '@page { size: 80mm auto; margin: 0; }'
-      : '@page { size: A4 portrait; margin: 8mm; }';
-
-    style.innerHTML = `
-      ${pageRule}
-
-      /* Screen: Never display the direct print container on screen */
-      @media screen {
-        #invoice-print-direct-container {
-          display: none !important;
-        }
-      }
-
-      /* Print: Strictly hide EVERYTHING except the dedicated direct print container */
-      @media print {
-        html, body {
-          height: auto !important;
-          min-height: 0 !important;
-          overflow: visible !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #ffffff !important;
-        }
-
-        /* HIDE the entire application tree, modal, backdrop, headers, dashboard */
-        body > *:not(#invoice-print-direct-container) {
-          display: none !important;
-        }
-
-        /* SHOW ONLY the dedicated invoice container */
-        #invoice-print-direct-container {
-          display: block !important;
-          position: static !important;
-          margin: 0 auto !important;
-          padding: 0 !important;
-          background: #ffffff !important;
-          width: ${isThermal ? '72mm' : '100%'} !important;
-          max-width: ${isThermal ? '72mm' : '190mm'} !important;
-        }
-
-        #invoice-print-direct-container #invoice-print-area {
-          display: block !important;
-          position: static !important;
-          width: 100% !important;
-          max-width: 100% !important;
-          margin: 0 auto !important;
-          padding: ${isThermal ? '2mm 0' : '0'} !important;
-          border: none !important;
-          box-shadow: none !important;
-          background: #ffffff !important;
-        }
-
-        #invoice-print-direct-container table {
-          width: 100% !important;
-          table-layout: fixed !important;
-        }
-
-        #invoice-print-direct-container tr {
-          page-break-inside: avoid !important;
-        }
-
-        .print-thermal {
-          width: 72mm !important;
-          max-width: 72mm !important;
-          font-size: 11px !important;
-          margin: 0 auto !important;
-        }
-
-        .print-a4 {
-          width: 190mm !important;
-          max-width: 190mm !important;
-          font-size: 13px !important;
-          margin: 0 auto !important;
-        }
-      }
-    `;
-
-    // 4. Cleanup function after print dialog closes or cancels
-    const cleanup = () => {
-      const container = document.getElementById('invoice-print-direct-container');
-      if (container) container.remove();
-      const s = document.getElementById('print-page-style');
-      if (s) s.remove();
-      window.removeEventListener('afterprint', cleanup);
-    };
-
-    window.addEventListener('afterprint', cleanup);
-
-    // 5. Brief timeout to allow browser layout to stabilize before opening print preview
-    setTimeout(() => {
-      window.print();
-    }, 100);
+    executeDirectPrint('invoice-print-area', printLayout === 'thermal');
   };
 
   return (
@@ -1724,7 +1609,7 @@ export function POSPage() {
                       printLayout === 'thermal' ? 'bg-white text-[#0B1120] shadow-xs font-bold' : 'text-slate-600'
                     }`}
                   >
-                    3-Inch Thermal Receipt
+                    3-Inch (80mm) Thermal Receipt
                   </button>
                   <button
                     type="button"
@@ -1749,7 +1634,11 @@ export function POSPage() {
             </div>
 
             {/* Dynamic Enterprise Invoice Document (Thermal / A4) */}
-            <div className="receipt-preview-container max-h-[65vh] overflow-y-auto p-4 bg-slate-100 rounded-xl flex justify-center">
+            <div className={`receipt-preview-container ${
+              printLayout === 'thermal'
+                ? 'max-h-[75vh] p-2 sm:p-3'
+                : 'max-h-[75vh] p-4'
+            } overflow-y-auto bg-slate-100/90 rounded-xl flex justify-center border border-slate-200 shadow-inner`}>
               <InvoiceDocument
                 invoice={successInvoice}
                 printLayout={printLayout}

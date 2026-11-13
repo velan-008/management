@@ -214,5 +214,6 @@ dist/assets/index-YuvIGJf7.js   787.36 kB │ gzip: 216.88 kB
 - [Security Guide](file:///e:/mangement/docs/SECURITY.md)
 - [User Guide](file:///e:/mangement/docs/USER_GUIDE.md)
 - [Implementation Status](file:///e:/mangement/docs/IMPLEMENTATION_STATUS.md)
-#   m a n a g e m e n t  
+#   m a n a g e m e n t 
+ 
  

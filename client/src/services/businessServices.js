@@ -62,6 +62,7 @@ export const saleService = {
   list: (params) => api.get('/sales', { params }),
   getById: (id) => api.get(`/sales/${id}`),
   create: (data) => api.post('/sales', data),
+  update: (id, data) => api.put(`/sales/${id}`, data),
   addPayment: (id, data) => api.post(`/sales/${id}/payments`, data),
   refund: (id, data) => api.post(`/sales/${id}/refund`, data)
 };
@@ -70,6 +71,7 @@ export const invoiceService = {
   list: (params) => api.get('/invoices', { params }),
   getById: (id) => api.get(`/invoices/${id}`),
   create: (data) => api.post('/invoices', data),
+  update: (id, data) => api.put(`/invoices/${id}`, data),
   syncBatch: (data) => api.post('/invoices/sync-batch', data)
 };
 

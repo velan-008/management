@@ -287,7 +287,11 @@ describe('BUSINESSFLOW — Invoice Generation System Tests', () => {
 
     const printArea = container.querySelector('#invoice-print-area');
     expect(printArea).toHaveClass('print-thermal');
-    expect(screen.getByText('*** TAX INVOICE ***')).toBeInTheDocument();
+    // Red-marked details removed from thermal receipt as requested
+    expect(screen.queryByText('*** TAX INVOICE ***')).not.toBeInTheDocument();
+    expect(screen.queryByText(/GSTIN: 27AABCB1234F1Z5/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Billed By:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Type \/ Mode:/)).not.toBeInTheDocument();
     expect(screen.getByText('Bisleri 1L Water')).toBeInTheDocument();
     expect(screen.getByText('GRAND TOTAL:')).toBeInTheDocument();
     expect(screen.getByText(/Computer Generated Wholesale Invoice/)).toBeInTheDocument();
@@ -341,5 +345,264 @@ describe('BUSINESSFLOW — Invoice Generation System Tests', () => {
     expect(screen.getByText('Britannia Marie Gold')).toBeInTheDocument();
     expect(screen.getAllByText('₹262.50').length).toBeGreaterThan(0);
     expect(screen.getByText('PAID')).toBeInTheDocument();
+  });
+
+  it('renders redesigned A4 Tax Invoice with complete 16 elements including HSN, GST, terms, and signatures', () => {
+    const fullA4Invoice = {
+      invoice_number: 'INV-20261112-9901',
+      invoice_date: '2026-11-12',
+      created_at: '2026-11-12T14:00:00.000Z',
+      subtotal: '2500.00',
+      discount_total: '100.00',
+      order_discount: '50.00',
+      tax_total: '282.00',
+      cgst_total: '141.00',
+      sgst_total: '141.00',
+      igst_total: '0.00',
+      round_off: '0.00',
+      grand_total: '2632.00',
+      paid_amount: '2000.00',
+      balance_due: '632.00',
+      payment_status: 'PARTIALLY_PAID',
+      payment_mode: 'SPLIT',
+      customer: {
+        id: 301,
+        name: 'Apex Wholesale Mart',
+        phone: '9898000000',
+        customer_type: 'WHOLESALE',
+        tax_number: '27AABCA5555M1Z9',
+        address: 'Plot 12, APMC Market',
+        city: 'Mumbai',
+        state: 'Maharashtra',
+        pincode: '400703',
+        outstanding_balance: 8500.00
+      },
+      items: [
+        {
+          product_name: 'Fortune Sunflower Oil 1L',
+          product_sku: 'SKU-OIL-1L',
+          hsn_code: '15121910',
+          quantity: 12,
+          free_quantity: 1,
+          unit_name: 'BOX',
+          unit_selling_price: '150.00',
+          discount_amount: '50.00',
+          taxable_amount: '1750.00',
+          tax_rate: '5.00',
+          tax_amount: '87.50',
+          cgst_amount: '43.75',
+          sgst_amount: '43.75',
+          line_total: '1837.50',
+          batch_number: 'BATCH-OIL-88',
+          expiry_date: '2027-12-31'
+        },
+        {
+          product_name: 'Cadbury Dairy Milk Silk',
+          product_sku: 'SKU-SILK-BAR',
+          hsn_code: '18063200',
+          quantity: 10,
+          free_quantity: 0,
+          unit_name: 'PCS',
+          unit_selling_price: '70.00',
+          discount_amount: '50.00',
+          taxable_amount: '650.00',
+          tax_rate: '18.00',
+          tax_amount: '117.00',
+          cgst_amount: '58.50',
+          sgst_amount: '58.50',
+          line_total: '767.00',
+          batch_number: 'BATCH-CD-02'
+        }
+      ],
+      payments: [
+        { payment_method: 'CASH', amount: '1000.00' },
+        { payment_method: 'UPI', amount: '1000.00', reference_number: 'UPI-776655' }
+      ]
+    };
+
+    render(
+      <InvoiceDocument
+        invoice={fullA4Invoice}
+        printLayout="a4"
+        business={mockBusiness}
+        currency="₹"
+      />
+    );
+
+    // 1. Business logo/name
+    expect(screen.getByText('BUSINESSFLOW WHOLESALE DISTRIBUTORS')).toBeInTheDocument();
+    // 2. Business address and contact info
+    expect(screen.getByText('Warehouse Hub 4, APMC Market')).toBeInTheDocument();
+    expect(screen.getByText('+91 98765 43210')).toBeInTheDocument();
+    expect(screen.getByText('billing@businessflow.com')).toBeInTheDocument();
+    // 3. GSTIN and state details
+    expect(screen.getByText('27AABCB1234F1Z5')).toBeInTheDocument();
+    // 4. TAX INVOICE heading
+    expect(screen.getByText('TAX INVOICE')).toBeInTheDocument();
+    // 5. Invoice number and date
+    expect(screen.getByText('INV-20261112-9901')).toBeInTheDocument();
+    expect(screen.getByText('12 Nov 2026')).toBeInTheDocument();
+    // 6. Customer details & GSTIN
+    expect(screen.getByText('Apex Wholesale Mart')).toBeInTheDocument();
+    expect(screen.getByText('9898000000')).toBeInTheDocument();
+    expect(screen.getByText('27AABCA5555M1Z9')).toBeInTheDocument();
+    // 7. Product details table & HSN Code
+    expect(screen.getByText('Fortune Sunflower Oil 1L')).toBeInTheDocument();
+    expect(screen.getByText('15121910')).toBeInTheDocument();
+    expect(screen.getByText('Cadbury Dairy Milk Silk')).toBeInTheDocument();
+    expect(screen.getByText('18063200')).toBeInTheDocument();
+    // 8. Subtotal & 9. Discount
+    expect(screen.getByText('Subtotal (Gross):')).toBeInTheDocument();
+    expect(screen.getByText('Total Discount:')).toBeInTheDocument();
+    // 10. CGST & SGST breakdown
+    expect(screen.getByText(/Central GST \(CGST\)/)).toBeInTheDocument();
+    expect(screen.getByText(/State GST \(SGST\)/)).toBeInTheDocument();
+    expect(screen.getByText('GST Tax Breakdown')).toBeInTheDocument();
+    // 11. Grand Total
+    expect(screen.getAllByText('₹2632.00').length).toBeGreaterThan(0);
+    // 12. Amount in Words
+    expect(screen.getByText('Amount in Words:')).toBeInTheDocument();
+    // 13. Payment details
+    expect(screen.getByText(/UPI-776655/)).toBeInTheDocument();
+    // 14. Paid Amount and Balance Due
+    expect(screen.getAllByText('₹2000.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('₹632.00').length).toBeGreaterThan(0);
+    // 15. Terms and Conditions
+    expect(screen.getByText('Terms and Conditions:')).toBeInTheDocument();
+    // 16. Authorized Signature
+    expect(screen.getByText('Authorized Signatory')).toBeInTheDocument();
+    expect(screen.getByText("Receiver's Signature & Seal")).toBeInTheDocument();
+  });
+
+  describe('Product Count Scaling & Print Boundary Handling (5, 15, 30, 50, 100 items)', () => {
+    const generateMockInvoice = (productCount, prefix = 'INV') => {
+      const items = Array.from({ length: productCount }, (_, i) => {
+        const idx = i + 1;
+        const qty = 2 + (idx % 3);
+        const freeQty = idx % 10 === 0 ? 1 : 0;
+        const rate = 100.00;
+        const disc = 10.00;
+        const taxable = (qty * rate) - disc;
+        const taxRate = 18.00;
+        const tax = taxable * 0.18;
+        const total = taxable + tax;
+        return {
+          product_id: idx,
+          product_name: `FMCG Item ${idx} Standard Distribution Pack`,
+          product_sku: `SKU-${String(idx).padStart(4, '0')}`,
+          hsn_code: `HSN${String(idx).padStart(4, '0')}`,
+          unit_name: idx % 2 === 0 ? 'BOX' : 'PCS',
+          quantity: qty,
+          free_quantity: freeQty,
+          unit_selling_price: rate.toFixed(2),
+          discount_amount: disc.toFixed(2),
+          taxable_amount: taxable.toFixed(2),
+          tax_rate: taxRate.toFixed(2),
+          tax_amount: tax.toFixed(2),
+          cgst_amount: (tax / 2).toFixed(2),
+          sgst_amount: (tax / 2).toFixed(2),
+          igst_amount: '0.00',
+          line_total: total.toFixed(2),
+          batch_number: `B-${idx}`
+        };
+      });
+
+      const subtotal = items.reduce((s, it) => s + (it.quantity * 100), 0);
+      const discount = items.reduce((s, it) => s + parseFloat(it.discount_amount), 0);
+      const tax = items.reduce((s, it) => s + parseFloat(it.tax_amount), 0);
+      const grand = items.reduce((s, it) => s + parseFloat(it.line_total), 0);
+
+      return {
+        invoice_number: `${prefix}-${productCount}`,
+        invoice_date: '2026-11-13',
+        created_at: '2026-11-13T10:00:00.000Z',
+        subtotal: subtotal.toFixed(2),
+        discount_total: discount.toFixed(2),
+        tax_total: tax.toFixed(2),
+        cgst_total: (tax / 2).toFixed(2),
+        sgst_total: (tax / 2).toFixed(2),
+        igst_total: '0.00',
+        round_off: '0.00',
+        grand_total: grand.toFixed(2),
+        paid_amount: grand.toFixed(2),
+        balance_due: '0.00',
+        payment_status: 'PAID',
+        payment_mode: 'CASH',
+        customer: {
+          name: 'Apex Wholesale Distributor',
+          customer_type: 'WHOLESALE',
+          phone: '9876543210',
+          tax_number: '27AAAAA0000A1Z5'
+        },
+        items,
+        payments: [{ payment_method: 'CASH', amount: grand.toFixed(2) }]
+      };
+    };
+
+    const countsToTest = [1, 5, 10, 15, 20, 30, 50, 100];
+
+    countsToTest.forEach((count) => {
+      it(`renders A4 Tax Invoice with ${count} products strictly visible on one page`, () => {
+        const inv = generateMockInvoice(count, 'INV-A4');
+        const { container } = render(
+          <InvoiceDocument
+            invoice={inv}
+            printLayout="a4"
+            business={mockBusiness}
+            currency="₹"
+          />
+        );
+
+        const printArea = container.querySelector('#invoice-print-area');
+        expect(printArea).toBeInTheDocument();
+        expect(printArea).toHaveClass('print-a4');
+
+        // Verify first, middle, and last item are all rendered and visible
+        expect(screen.getByText('FMCG Item 1 Standard Distribution Pack')).toBeInTheDocument();
+        const midIdx = Math.ceil(count / 2);
+        expect(screen.getByText(`FMCG Item ${midIdx} Standard Distribution Pack`)).toBeInTheDocument();
+        expect(screen.getByText(`FMCG Item ${count} Standard Distribution Pack`)).toBeInTheDocument();
+
+        // Verify all count rows exist in product table (first table)
+        const productTable = container.querySelector('table');
+        const rows = productTable.querySelectorAll('tbody tr');
+        expect(rows.length).toBe(count);
+
+        // Verify statutory sections are completely present
+        expect(screen.getByText('TAX INVOICE')).toBeInTheDocument();
+        expect(screen.getByText('GST Tax Breakdown')).toBeInTheDocument();
+        expect(screen.getByText('Authorized Signatory')).toBeInTheDocument();
+        expect(screen.getByText("Receiver's Signature & Seal")).toBeInTheDocument();
+      });
+
+      it(`renders 80mm Thermal Receipt with ${count} products continuously without truncation`, () => {
+        const inv = generateMockInvoice(count, 'INV-TH');
+        const { container } = render(
+          <InvoiceDocument
+            invoice={inv}
+            printLayout="thermal"
+            business={mockBusiness}
+            currency="₹"
+          />
+        );
+
+        const printArea = container.querySelector('#invoice-print-area');
+        expect(printArea).toBeInTheDocument();
+        expect(printArea).toHaveClass('print-thermal');
+
+        // Verify first, middle, and last item are all rendered
+        expect(screen.getByText('FMCG Item 1 Standard Distribution Pack')).toBeInTheDocument();
+        const midIdx = Math.ceil(count / 2);
+        expect(screen.getByText(`FMCG Item ${midIdx} Standard Distribution Pack`)).toBeInTheDocument();
+        expect(screen.getByText(`FMCG Item ${count} Standard Distribution Pack`)).toBeInTheDocument();
+
+        // Verify all items are rendered without truncate class
+        const itemNames = container.querySelectorAll('.leading-tight.break-words');
+        expect(itemNames.length).toBeGreaterThanOrEqual(count);
+
+        // Verify footer summary exists
+        expect(screen.getByText(new RegExp(`Items:\\s*${count}\\s*\\|\\s*Total Qty:`))).toBeInTheDocument();
+      });
+    });
   });
 });

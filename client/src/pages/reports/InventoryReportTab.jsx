@@ -94,7 +94,7 @@ export function InventoryReportTab({ currency = '₹' }) {
           <select
             value={stockFilter}
             onChange={(e) => setStockFilter(e.target.value)}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white text-slate-700"
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#E99FC1] focus:border-[#E99FC1] bg-white text-slate-700"
           >
             <option value="ALL">All Stock Levels</option>
             <option value="IN">In Stock (Healthy)</option>

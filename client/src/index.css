@@ -79,10 +79,7 @@
   #invoice-print-direct-container table {
     width: 100% !important;
     table-layout: fixed !important;
-  }
-
-  #invoice-print-direct-container tr {
-    page-break-inside: avoid !important;
+    border-collapse: collapse !important;
   }
 
   .no-print {
@@ -90,24 +87,53 @@
   }
 }
 
-/* thermal format */
+/* 3-Inch (80mm) Thermal format - continuous receipt roll */
 @media print {
   .print-thermal {
     width: 72mm !important;
     max-width: 72mm !important;
     margin: 0 auto !important;
-    font-size: 11px !important;
-    padding: 2mm 0 !important;
+    padding: 1mm 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  .print-thermal * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 
-/* A4 format */
+/* A4 Tax Invoice format - strictly fits inside ONE A4 page */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 5mm;
+  }
+
   .print-a4 {
-    width: 190mm !important;
-    max-width: 190mm !important;
+    width: 100% !important;
+    max-width: 200mm !important;
+    height: auto !important;
+    max-height: 275mm !important;
     margin: 0 auto !important;
-    font-size: 13px !important;
     padding: 0 !important;
+    box-sizing: border-box !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-a4 * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

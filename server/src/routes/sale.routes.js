@@ -9,6 +9,7 @@ router.use(authenticate);
 router.get('/', saleController.list);
 router.post('/', saleController.create);
 router.get('/:id', saleController.getById);
+router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), saleController.update);
 router.post('/:id/payments', saleController.addPayment);
 router.post('/:id/refund', authorizeRoles('ADMIN', 'MANAGER'), saleController.refund);
 

@@ -5,6 +5,7 @@ import {
   StockMovement, Refund, RefundItem, Business, AuditLog
 } from '../models/index.js';
 import { apiResponse } from '../utils/apiResponse.js';
+import { invoiceController } from './invoice.controller.js';
 
 /**
  * Generate a collision-safe, unique invoice number: INV-YYYYMMDD-XXXX
@@ -782,5 +783,12 @@ export const saleController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  /**
+   * PUT /api/sales/:id — Update/Edit sale invoice (Admin / Manager only)
+   */
+  update: async (req, res, next) => {
+    return invoiceController.update(req, res, next);
   }
 };

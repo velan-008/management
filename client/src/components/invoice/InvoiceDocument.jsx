@@ -64,6 +64,11 @@ export function InvoiceDocument({
     ? ''
     : parsedDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+  const parsedDueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+  const formattedDueDate = parsedDueDate && !isNaN(parsedDueDate.getTime())
+    ? parsedDueDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : formattedDate;
+
   // Monetary Calculations
   const subtotalVal = parseFloat(invoice.subtotal || invoice.total_amount || 0);
   const discountVal = parseFloat(invoice.discount_total || invoice.discount_amount || 0);
@@ -108,10 +113,13 @@ export function InvoiceDocument({
     const sgst = parseFloat(it.sgst_amount !== undefined ? it.sgst_amount : (isInterState ? 0 : taxAmt / 2));
     const igst = parseFloat(it.igst_amount !== undefined ? it.igst_amount : (isInterState ? taxAmt : 0));
 
+    const hsn = it.hsn_code || it.product_hsn || it.hsn || it.product?.hsn || it.product?.hsn_code || it.sku || it.product_sku || '';
+
     return {
       index: idx + 1,
       name: it.product_name || 'Product Item',
       sku: it.product_sku || '',
+      hsn: hsn,
       batch: it.batch_number ? String(it.batch_number).trim() : '',
       expiry: it.expiry_date || '',
       unit: (it.unit_name || 'PCS').toUpperCase(),
@@ -181,43 +189,139 @@ export function InvoiceDocument({
 
   const amountInWords = numberToWords(grandTotalVal);
 
+  // Dynamic Density Calculation based on item count for strict 1-page A4 fitting
+  const count = items.length;
+  const density =
+    count <= 6
+      ? 'standard'
+      : count <= 15
+      ? 'compact'
+      : count <= 30
+      ? 'dense'
+      : count <= 55
+      ? 'ultra-dense'
+      : 'micro-dense';
+
+  const a4ContainerPad =
+    density === 'micro-dense'
+      ? 'p-1.5'
+      : density === 'ultra-dense'
+      ? 'p-2'
+      : density === 'dense'
+      ? 'p-2.5'
+      : density === 'compact'
+      ? 'p-3'
+      : 'p-3.5 sm:p-4';
+
+  const a4Spacing =
+    density === 'micro-dense'
+      ? 'space-y-1'
+      : density === 'ultra-dense'
+      ? 'space-y-1'
+      : density === 'dense'
+      ? 'space-y-1.5'
+      : density === 'compact'
+      ? 'space-y-1.5'
+      : 'space-y-2';
+
+  // Dynamic Thermal Density Calculation based on item count for zero overflow
+  const thermalItemCount = items.length;
+  const thermalDensity =
+    thermalItemCount <= 5
+      ? 'standard'
+      : thermalItemCount <= 10
+      ? 'compact'
+      : thermalItemCount <= 15
+      ? 'dense'
+      : 'ultra-dense';
+
+  const thermalContainerPad =
+    thermalDensity === 'ultra-dense'
+      ? 'p-1.5'
+      : thermalDensity === 'dense'
+      ? 'p-2'
+      : thermalDensity === 'compact'
+      ? 'p-2'
+      : 'p-2 sm:p-2.5';
+
+  const thermalSpacing =
+    thermalDensity === 'ultra-dense'
+      ? 'space-y-0.5'
+      : thermalDensity === 'dense'
+      ? 'space-y-0.75'
+      : thermalDensity === 'compact'
+      ? 'space-y-0.75'
+      : 'space-y-1';
+
+  const thermalHeadSize =
+    thermalDensity === 'ultra-dense' || thermalDensity === 'dense'
+      ? 'text-xs'
+      : 'text-[13px]';
+
+  const thermalMetaSize =
+    thermalDensity === 'ultra-dense'
+      ? 'text-[8px]'
+      : thermalDensity === 'dense'
+      ? 'text-[8.5px]'
+      : 'text-[9px]';
+
+  const thermalItemRowPad =
+    thermalDensity === 'ultra-dense'
+      ? 'py-0.2'
+      : thermalDensity === 'dense'
+      ? 'py-0.35'
+      : 'py-0.5';
+
+  const thermalItemTitleSize =
+    thermalDensity === 'ultra-dense'
+      ? 'text-[8.5px]'
+      : thermalDensity === 'dense'
+      ? 'text-[9px]'
+      : 'text-[9.5px]';
+
+  const thermalItemDetailSize =
+    thermalDensity === 'ultra-dense'
+      ? 'text-[7.5px]'
+      : thermalDensity === 'dense'
+      ? 'text-[8px]'
+      : 'text-[8.5px]';
+
   return (
     <div
       id="invoice-print-area"
       className={`${printLayout === 'thermal' ? 'print-thermal' : 'print-a4'} bg-white ${
         printLayout === 'thermal'
-          ? 'w-[340px] p-3.5 shadow-sm border border-slate-200 font-mono text-[11px] leading-tight text-slate-900 select-text'
-          : 'w-[750px] p-8 shadow-sm border border-slate-200 text-xs text-slate-900 space-y-5 select-text'
+          ? `w-[72mm] max-w-[72mm] ${thermalContainerPad} shadow-sm border border-slate-200 font-mono text-slate-900 select-text box-border`
+          : 'w-full max-w-[800px] p-2 bg-white text-black select-text shadow-none border-0'
       }`}
     >
       {/* =========================================================================
-          FORMAT 1: 80mm THERMAL RECEIPT
+          FORMAT 1: 80mm THERMAL RECEIPT (CONTINUOUS ROLL PRINTING)
       ========================================================================= */}
       {printLayout === 'thermal' ? (
-        <div className="space-y-2">
+        <div className={thermalSpacing}>
           {/* Business & Header */}
-          <div className="text-center pb-2 border-b border-dashed border-slate-400">
-            <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-950">
+          <div className="text-center pb-0.75 border-b border-dashed border-slate-400">
+            <h2 className={`${thermalHeadSize} font-extrabold uppercase tracking-wider text-slate-950 leading-tight`}>
               {businessName}
             </h2>
-            <p className="text-[10px] text-slate-600 leading-tight mt-0.5">{businessAddress}</p>
+            <p className="text-[9px] text-slate-600 leading-tight mt-0.5">{businessAddress}</p>
             {businessPhone && (
-              <p className="text-[10px] text-slate-600">Ph: {businessPhone}</p>
+              <p className="text-[9px] text-slate-600 leading-tight">Ph: {businessPhone}</p>
             )}
-            {businessGstin && (
-              <p className="text-[10px] font-bold text-slate-800 mt-0.5">GSTIN: {businessGstin}</p>
+            {isOffline && (
+              <div className="mt-0.5 inline-block border-y border-dashed border-slate-700 py-0.2 px-1.5">
+                <span className="text-[9.5px] font-extrabold uppercase tracking-wider text-slate-950">
+                  *** PROVISIONAL OFFLINE BILL ***
+                </span>
+              </div>
             )}
-            <div className="mt-1 inline-block border-y border-dashed border-slate-700 py-0.5 px-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider">
-                *** {invoiceTypeTitle} ***
-              </span>
-            </div>
           </div>
 
-          {/* Invoice & Customer Meta */}
-          <div className="py-1.5 border-b border-dashed border-slate-400 space-y-0.5 text-[10px]">
+          {/* Invoice Meta */}
+          <div className={`py-0.75 border-b border-dashed border-slate-400 space-y-0.2 ${thermalMetaSize} leading-tight`}>
             {isOffline && (
-              <div className="mb-1 p-1 bg-amber-50 border border-dashed border-amber-400 text-amber-900 text-center text-[9px] font-bold">
+              <div className="mb-0.5 p-0.5 bg-amber-50 border border-dashed border-amber-400 text-amber-900 text-center text-[8px] font-bold">
                 * PROVISIONAL OFFLINE BILL — PENDING SYNC *
               </div>
             )}
@@ -226,7 +330,7 @@ export function InvoiceDocument({
               <span className="font-bold font-mono text-slate-900">{isOffline ? (invoice.provisional_number || invoiceNumber) : invoiceNumber}</span>
             </div>
             {invoice.provisional_number && !isOffline && (
-              <div className="flex justify-between text-[9px] text-slate-500">
+              <div className="flex justify-between text-[8px] text-slate-500">
                 <span>(Offline Ref):</span>
                 <span className="font-mono">{invoice.provisional_number}</span>
               </div>
@@ -235,35 +339,11 @@ export function InvoiceDocument({
               <span className="font-semibold text-slate-600">Date & Time:</span>
               <span>{formattedDate} {formattedTime}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-slate-600">Billed By:</span>
-              <span>{cashierName}</span>
-            </div>
-            <div className="flex justify-between pt-1 border-t border-dotted border-slate-300">
-              <span className="font-semibold text-slate-600">Customer:</span>
-              <span className="font-bold text-slate-900 truncate max-w-[170px]">{customerName}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-slate-600">Type / Mode:</span>
-              <span className="font-semibold">{customerTypeLabel} / {invoice.payment_mode || 'CASH'}</span>
-            </div>
-            {customerPhone && (
-              <div className="flex justify-between">
-                <span className="font-semibold text-slate-600">Contact:</span>
-                <span>{customerPhone}</span>
-              </div>
-            )}
-            {customerGstin && (
-              <div className="flex justify-between">
-                <span className="font-semibold text-slate-600">Customer GSTIN:</span>
-                <span className="font-bold font-mono">{customerGstin}</span>
-              </div>
-            )}
           </div>
 
-          {/* Line Items Table */}
-          <div className="py-1.5 border-b border-dashed border-slate-400">
-            <div className="flex justify-between font-bold border-b border-slate-900 pb-1 text-[10px] uppercase">
+          {/* Line Items Table (Continuous, Never Truncated) */}
+          <div className="py-0.75 border-b border-dashed border-slate-400">
+            <div className="flex justify-between font-bold border-b border-slate-900 pb-0.5 text-[9px] uppercase tracking-tight">
               <span className="w-6/12">Item / Unit</span>
               <span className="w-3/12 text-right">Qty x Rate</span>
               <span className="w-3/12 text-right">Total</span>
@@ -271,27 +351,28 @@ export function InvoiceDocument({
 
             <div className="divide-y divide-dotted divide-slate-200 py-0.5">
               {items.map((it) => (
-                <div key={it.index} className="py-1 text-[10px]">
-                  <div className="flex justify-between">
-                    <span className="font-bold text-slate-900 leading-snug w-7/12 truncate pr-1">
+                <div key={it.index} className={thermalItemRowPad}>
+                  <div className="flex justify-between items-start gap-1">
+                    <span className={`font-bold text-slate-900 leading-tight w-7/12 break-words pr-0.5 ${thermalItemTitleSize}`}>
                       {it.name}
                     </span>
-                    <span className="font-mono text-right w-5/12 font-bold text-slate-900">
+                    <span className={`font-mono text-right w-5/12 font-bold text-slate-900 shrink-0 ${thermalItemTitleSize}`}>
                       {currency}{it.lineTotal.toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between text-[9px] text-slate-600 mt-0.5">
-                    <span>
+                  <div className={`flex justify-between text-slate-600 mt-0.2 ${thermalItemDetailSize} leading-tight`}>
+                    <span className="break-words">
                       {it.sku && `[${it.sku}]`}
                       {it.batch && ` B:${it.batch}`}
+                      {it.expiry && ` E:${it.expiry}`}
                       {it.freeQuantity > 0 && ` (+${it.freeQuantity} Free)`}
                     </span>
-                    <span>
+                    <span className="shrink-0 text-right">
                       {it.quantity} {it.unit} @ {currency}{it.unitPrice.toFixed(2)}
                     </span>
                   </div>
                   {Boolean(it.discountAmount > 0 || it.taxRate > 0) && (
-                    <div className="flex justify-between text-[9px] text-slate-500">
+                    <div className={`flex justify-between text-slate-500 ${thermalItemDetailSize} leading-tight`}>
                       <span>
                         {it.discountAmount > 0 ? `Disc: −${currency}${it.discountAmount.toFixed(2)}` : ''}
                       </span>
@@ -306,7 +387,7 @@ export function InvoiceDocument({
           </div>
 
           {/* Totals Summary */}
-          <div className="py-1.5 border-b border-dashed border-slate-400 space-y-1 text-[10px]">
+          <div className={`py-0.75 border-b border-dashed border-slate-400 space-y-0.2 ${thermalMetaSize} leading-tight`}>
             <div className="flex justify-between">
               <span className="text-slate-600">Subtotal (Gross):</span>
               <span className="font-mono">{currency}{subtotalVal.toFixed(2)}</span>
@@ -341,22 +422,22 @@ export function InvoiceDocument({
               )
             )}
             {roundOffVal !== 0 && (
-              <div className="flex justify-between text-slate-500 text-[9px]">
+              <div className="flex justify-between text-slate-500 text-[8px]">
                 <span>Round Off:</span>
                 <span className="font-mono">{roundOffVal > 0 ? `+${roundOffVal.toFixed(2)}` : roundOffVal.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between text-xs font-black pt-1.5 border-t-2 border-slate-900 text-slate-950">
+            <div className="flex justify-between font-black pt-0.75 border-t-2 border-slate-900 text-slate-950">
               <span className="tracking-wide">GRAND TOTAL:</span>
               <span className="font-mono text-sm">{currency}{grandTotalVal.toFixed(2)}</span>
             </div>
           </div>
 
           {/* Payment & Ledger Details */}
-          <div className="py-1.5 border-b border-dashed border-slate-400 space-y-0.5 text-[10px]">
+          <div className={`py-0.75 border-b border-dashed border-slate-400 space-y-0.2 ${thermalMetaSize} leading-tight`}>
             <div className="flex justify-between items-center">
               <span className="font-bold text-slate-700 uppercase">Payment Status:</span>
-              <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${
+              <span className={`font-bold px-1.5 py-0.2 rounded text-[8px] ${
                 paymentStatus === 'PAID'
                   ? 'bg-emerald-100 text-emerald-800'
                   : (paymentStatus === 'PARTIALLY_PAID' || paymentStatus === 'PENDING_CONFIRMATION')
@@ -376,18 +457,18 @@ export function InvoiceDocument({
                 <span className="font-mono font-semibold">{currency}{parseFloat(pm.amount || 0).toFixed(2)}</span>
               </div>
             ))}
-            <div className="flex justify-between font-semibold pt-1 border-t border-dotted border-slate-300">
+            <div className="flex justify-between font-semibold pt-0.5 border-t border-dotted border-slate-300">
               <span>Paid Amount:</span>
               <span className="font-mono">{currency}{paidVal.toFixed(2)}</span>
             </div>
             {balanceDueVal > 0 && (
-              <div className="flex justify-between font-bold text-amber-900 bg-amber-50 px-1 py-0.5 rounded">
+              <div className="flex justify-between font-bold text-amber-900 bg-amber-50 px-1 py-0.2 rounded">
                 <span>Balance Due (Credit):</span>
                 <span className="font-mono">{currency}{balanceDueVal.toFixed(2)}</span>
               </div>
             )}
             {customerLedgerBalance > 0 && (
-              <div className="flex justify-between text-[9px] text-slate-600 pt-0.5">
+              <div className="flex justify-between text-[8px] text-slate-600 pt-0.2">
                 <span>Total Customer Outstanding:</span>
                 <span className="font-mono font-semibold">{currency}{customerLedgerBalance.toFixed(2)}</span>
               </div>
@@ -395,382 +476,415 @@ export function InvoiceDocument({
           </div>
 
           {/* Footer */}
-          <div className="text-center pt-1 text-[9px] text-slate-500 space-y-0.5">
+          <div className="text-center pt-0.75 text-[8.5px] text-slate-500 space-y-0.2 leading-tight">
             <p className="font-mono">Items: {items.length} | Total Qty: {totalQuantitySum}{totalFreeQuantitySum > 0 ? ` (+${totalFreeQuantitySum} Free)` : ''}</p>
             <p className="font-semibold text-slate-700">Thank you for your business!</p>
-            <p>Goods once sold returnable only with original receipt.</p>
-            <p className="text-[8px] text-slate-400">Computer Generated Wholesale Invoice</p>
+            <p className="text-[8px]">Goods once sold returnable only with original receipt.</p>
+            <p className="text-[7.5px] text-slate-400">Computer Generated Wholesale Invoice</p>
           </div>
         </div>
       ) : (
         /* =========================================================================
-            FORMAT 2: A4 TAX INVOICE
+            FORMAT 2: A4 TAX INVOICE (PROFESSIONAL WHOLESALE FMCG GST FORMAT)
         ========================================================================= */
-        <div className="space-y-4">
-          {/* Top Brand & Document Identification Header */}
-          <div className="flex items-start justify-between border-b-2 border-[#0B1120] pb-4">
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-xl bg-[#0B1120] text-[#D4AF37] font-extrabold flex items-center justify-center text-xl tracking-tight shadow-sm border border-[#D4AF37]/40 shrink-0">
-                BF
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xl font-black tracking-tight text-[#0B1120] uppercase">
-                  {businessName}
-                </h1>
-                <p className="text-slate-600 text-[11px] leading-tight max-w-sm mt-0.5">
-                  {businessAddress}
-                </p>
-                <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1">
-                  {businessPhone && <span>Phone: <strong className="text-slate-800">{businessPhone}</strong></span>}
-                  {businessEmail && <span>Email: <strong className="text-slate-800">{businessEmail}</strong></span>}
-                </div>
-                {businessGstin && (
-                  <p className="text-[11px] font-bold text-[#0B1120] mt-1 font-mono">
-                    GSTIN / UIN: <span className="bg-amber-100 text-amber-950 px-1.5 py-0.5 rounded border border-amber-300">{businessGstin}</span>
-                    {businessState && <span className="ml-2 font-sans font-semibold text-slate-600 text-[10px]">State: {businessState}</span>}
-                  </p>
-                )}
-              </div>
-            </div>
+        <div className={`font-sans text-black bg-white border border-black ${
+          density === 'micro-dense'
+            ? 'text-[6.5px] leading-[1.1]'
+            : density === 'ultra-dense'
+            ? 'text-[7.5px] leading-tight'
+            : density === 'dense'
+            ? 'text-[8.5px] leading-snug'
+            : density === 'compact'
+            ? 'text-[9.5px] leading-snug'
+            : 'text-[10px] leading-normal'
+        }`}>
+          {/* =========================================================================
+              1. TOP HEADER BAR: Page Number | TAX INVOICE | Original Copy
+          ========================================================================= */}
+          <div className="flex justify-between items-center px-2 py-0.5 border-b border-black font-bold uppercase tracking-wider text-[0.9em]">
+            <span>Page 1 of 1</span>
+            <span className="text-[1.25em] font-extrabold tracking-widest">{invoiceTypeTitle}</span>
+            <span>Original Copy</span>
+          </div>
 
-            <div className="text-right shrink-0">
-              <div className="inline-block bg-[#0B1120] text-[#D4AF37] border border-[#D4AF37]/30 px-3.5 py-1 rounded-lg">
-                <h2 className="text-sm font-black uppercase tracking-wider">
-                  {invoiceTypeTitle}
-                </h2>
-                <p className="text-[9px] text-slate-300 uppercase tracking-widest font-semibold">
-                  Original for Recipient
-                </p>
-              </div>
-              <div className="mt-2 text-right space-y-0.5 font-mono text-[11px]">
-                {isOffline && (
-                  <p className="text-amber-700 font-sans font-bold text-[10px] bg-amber-50 border border-amber-200 px-1 py-0.5 rounded">
-                    PROVISIONAL BILL (OFFLINE)
-                  </p>
-                )}
-                <p>{isOffline ? 'Provisional Ref:' : 'Invoice No:'} <strong className="text-slate-900 text-xs">{isOffline ? (invoice.provisional_number || invoiceNumber) : invoiceNumber}</strong></p>
-                {invoice.provisional_number && !isOffline && (
-                  <p className="text-[10px] text-slate-500">Offline Ref: <span>{invoice.provisional_number}</span></p>
-                )}
-                <p className="text-slate-600">Date: <strong className="text-slate-800">{formattedDate}</strong></p>
-                <p className="text-slate-600">Time: <span>{formattedTime}</span></p>
-                <p className="text-slate-600">Mode: <strong className="text-slate-800">{invoice.payment_mode || 'CASH'}</strong></p>
-                {businessState && <p className="text-[10px] text-slate-500 font-sans">Place of Supply: {customerState || businessState}</p>}
-              </div>
+          {/* =========================================================================
+              2. COMPANY DETAILS (Name, Address, Mobile, GSTIN)
+          ========================================================================= */}
+          <div className="text-center px-3 py-1.5 border-b border-black">
+            <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-black leading-tight">
+              {businessName}
+            </h1>
+            <p className="text-[0.9em] text-black mt-0.5 max-w-xl mx-auto leading-tight">
+              {businessAddress}
+            </p>
+            <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-0.5 text-[0.9em] mt-0.5">
+              {businessPhone && (
+                <span>Mobile: <strong className="font-mono">{businessPhone}</strong></span>
+              )}
+              {businessEmail && (
+                <span>Email: <strong className="font-sans">{businessEmail}</strong></span>
+              )}
+              {businessGstin && (
+                <span>GSTIN: <strong className="font-mono">{businessGstin}</strong></span>
+              )}
             </div>
           </div>
 
-          {/* Customer & Account Overview Card */}
-          <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-[11px]">
-            {/* Left: Billed To / Consignee */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Billed To (Customer):
-                </span>
-                <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded border ${
-                  isWholesaleCustomer
-                    ? 'bg-[#0B1120] text-[#D4AF37] border-[#D4AF37]/40'
-                    : 'bg-slate-200 text-slate-700 border-slate-300'
-                }`}>
+          {/* =========================================================================
+              3. BILLING DETAILS (LEFT) & INVOICE DETAILS (RIGHT)
+          ========================================================================= */}
+          <div className="grid grid-cols-2 border-b border-black">
+            {/* Left Column: Billing Details */}
+            <div className="p-1.5 border-r border-black space-y-0.5 text-[0.9em]">
+              <div className="flex justify-between items-center border-b border-black/40 pb-0.5">
+                <span className="font-bold uppercase tracking-wider underline">Billing Details:</span>
+                <span className="font-bold uppercase text-[0.85em] border border-black px-1 rounded-xs">
                   {customerTypeLabel}
                 </span>
               </div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <div className="font-bold text-[1.1em] text-black pt-0.5 leading-tight">
                 {customerName}
-              </h3>
+              </div>
               {customerAddress && (
-                <p className="text-slate-600 leading-snug">{customerAddress}</p>
+                <div className="text-black leading-tight">{customerAddress}</div>
               )}
-              {customerPhone && (
-                <p className="text-slate-600">Phone: <strong className="text-slate-800">{customerPhone}</strong></p>
-              )}
-              <p className="font-mono font-semibold text-slate-800">
-                Customer GSTIN: {customerGstin ? <span className="font-bold text-slate-950">{customerGstin}</span> : <span className="text-slate-500 font-normal italic">Unregistered</span>}
-              </p>
+              <div className="text-black">
+                Mobile: <strong className="font-mono">{customerPhone || '—'}</strong>
+              </div>
+              <div className="text-black">
+                GSTIN: <strong className="font-mono">{customerGstin || 'Unregistered (URP)'}</strong>
+              </div>
+              <div className="text-black">
+                State: <strong className="font-sans">{customerState || businessState || 'Tamil Nadu'}</strong>
+              </div>
             </div>
 
-            {/* Right: Payment & Account Status */}
-            <div className="text-right space-y-1 pl-4 border-l border-slate-200">
-              <div className="flex items-center justify-end gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Payment Status:
-                </span>
-                <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${
-                  paymentStatus === 'PAID'
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                    : (paymentStatus === 'PARTIALLY_PAID' || paymentStatus === 'PENDING_CONFIRMATION')
-                    ? 'bg-amber-100 text-amber-800 border-amber-300'
-                    : 'bg-rose-100 text-rose-800 border-rose-300'
-                }`}>
-                  {paymentStatusLabel}
-                </span>
+            {/* Right Column: Invoice Details */}
+            <div className="p-1.5 space-y-0.5 text-[0.9em]">
+              <div className="space-y-0.5 text-[1em] leading-tight font-mono">
+                <div className="flex justify-between items-center py-0.2">
+                  <span className="font-semibold text-black font-sans">Invoice Number:</span>
+                  <span className="font-bold text-black">
+                    {isOffline ? (invoice.provisional_number || invoiceNumber) : invoiceNumber}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-0.2">
+                  <span className="font-semibold text-black font-sans">Invoice Date:</span>
+                  <span className="text-black">{formattedDate}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.2">
+                  <span className="font-semibold text-black font-sans">Due Date:</span>
+                  <span className="text-black">{invoice.due_date ? formattedDueDate : '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.2">
+                  <span className="font-semibold text-black font-sans">Place of Supply:</span>
+                  <span className="text-black font-sans font-semibold">
+                    {customerState || businessState || 'Tamil Nadu'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-0.2">
+                  <span className="font-semibold text-black font-sans">Reverse Charge:</span>
+                  <span className="text-black font-sans">No</span>
+                </div>
               </div>
-              <p className="text-slate-600">Billed By: <strong className="text-slate-900">{cashierName}</strong></p>
-              <p className="text-slate-600">
-                Total Invoice Value: <strong className="font-mono text-slate-900">{currency}{grandTotalVal.toFixed(2)}</strong>
-              </p>
-              <p className="text-slate-600">
-                Amount Received: <strong className="font-mono text-emerald-700">{currency}{paidVal.toFixed(2)}</strong>
-              </p>
-              {balanceDueVal > 0 && (
-                <p className="text-amber-800 font-bold">
-                  Balance Due on Bill: <span className="font-mono">{currency}{balanceDueVal.toFixed(2)}</span>
-                </p>
-              )}
-              {customerLedgerBalance > 0 && (
-                <p className="text-slate-600 text-[10px] pt-0.5 border-t border-slate-200">
-                  Total Customer Outstanding: <strong className="font-mono text-slate-900">{currency}{customerLedgerBalance.toFixed(2)}</strong>
-                </p>
-              )}
+
+              <div className="flex justify-between items-center pt-0.5 border-t border-dotted border-black/40 text-[0.85em]">
+                <span>Status: <strong className="font-bold uppercase font-sans">{paymentStatusLabel}</strong></span>
+                {balanceDueVal > 0 && (
+                  <span>Balance Due on Bill: <strong className="font-mono font-bold">{currency}{balanceDueVal.toFixed(2)}</strong></span>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Detailed Products Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px] border border-slate-300 table-fixed">
-              <thead className="bg-[#0B1120] text-white font-bold uppercase tracking-wider text-[10px]">
-                <tr>
-                  <th className="py-2 px-1.5 w-7 text-center">#</th>
-                  <th className="py-2 px-2 w-32">Description of Goods</th>
-                  <th className="py-2 px-1.5 w-16">HSN/SKU</th>
-                  <th className="py-2 px-1.5 w-16">Batch</th>
-                  <th className="py-2 px-1.5 w-12 text-center">Unit</th>
-                  <th className="py-2 px-1.5 w-12 text-center">Qty</th>
-                  <th className="py-2 px-1.5 w-12 text-center">Free</th>
-                  <th className="py-2 px-1.5 w-16 text-right">Rate</th>
-                  <th className="py-2 px-1.5 w-14 text-right">Disc</th>
-                  <th className="py-2 px-2 w-18 text-right">Taxable</th>
-                  <th className="py-2 px-1.5 w-12 text-center">GST%</th>
-                  <th className="py-2 px-2 w-16 text-right">GST</th>
-                  <th className="py-2 px-2 w-20 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 font-medium">
-                {items.map((it) => (
-                  <tr key={it.index} className="hover:bg-slate-50">
-                    <td className="py-1.5 px-1.5 text-center text-slate-400 font-mono text-[10px]">{it.index}</td>
-                    <td className="py-1.5 px-2 font-bold text-slate-900 truncate">
-                      {it.name}
-                    </td>
-                    <td className="py-1.5 px-1.5 font-mono text-[10px] text-slate-600 truncate">{it.sku || '—'}</td>
-                    <td className="py-1.5 px-1.5 font-mono text-[10px] text-slate-600 truncate">{it.batch || '—'}</td>
-                    <td className="py-1.5 px-1.5 text-center font-bold text-slate-700 text-[10px]">{it.unit}</td>
-                    <td className="py-1.5 px-1.5 text-center font-bold font-mono text-slate-900">{it.quantity}</td>
-                    <td className="py-1.5 px-1.5 text-center font-bold font-mono text-emerald-600">
-                      {it.freeQuantity > 0 ? `+${it.freeQuantity}` : '—'}
-                    </td>
-                    <td className="py-1.5 px-1.5 text-right font-mono text-slate-800">
-                      {currency}{it.unitPrice.toFixed(2)}
-                    </td>
-                    <td className="py-1.5 px-1.5 text-right font-mono text-slate-600">
-                      {it.discountAmount > 0 ? `${currency}${it.discountAmount.toFixed(2)}` : '0.00'}
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-mono font-semibold text-slate-900">
-                      {currency}{it.taxableAmount.toFixed(2)}
-                    </td>
-                    <td className="py-1.5 px-1.5 text-center font-mono text-slate-700">{it.taxRate}%</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-slate-700">
-                      {currency}{it.taxAmount.toFixed(2)}
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-mono font-bold text-slate-950">
-                      {currency}{it.lineTotal.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300 text-[10px]">
-                <tr>
-                  <td colSpan="5" className="py-1.5 px-2 text-right uppercase">Total:</td>
-                  <td className="py-1.5 px-1.5 text-center font-mono text-slate-900">{totalQuantitySum}</td>
-                  <td className="py-1.5 px-1.5 text-center font-mono text-emerald-700">{totalFreeQuantitySum > 0 ? `+${totalFreeQuantitySum}` : '—'}</td>
-                  <td colSpan="2" className="py-1.5 px-1.5"></td>
-                  <td className="py-1.5 px-2 text-right font-mono">{currency}{taxableTotalVal.toFixed(2)}</td>
-                  <td></td>
-                  <td className="py-1.5 px-2 text-right font-mono">{currency}{taxTotalVal.toFixed(2)}</td>
-                  <td className="py-1.5 px-2 text-right font-mono text-slate-950">{currency}{grandTotalVal.toFixed(2)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          {/* GST Slabs Breakdown Table (GST Compliance) */}
-          {isGstInvoice && gstSlabs.length > 0 && (
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
-              <div className="bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200">
-                GST Tax Slabs & Rate Breakdown
-              </div>
-              <table className="w-full text-left text-[10px] table-fixed">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="py-1 px-2">GST Rate</th>
-                    <th className="py-1 px-2 text-right">Taxable Value</th>
-                    {isInterState ? (
-                      <>
-                        <th className="py-1 px-2 text-right">IGST Rate</th>
-                        <th className="py-1 px-2 text-right">IGST Amount</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="py-1 px-2 text-right">CGST Rate</th>
-                        <th className="py-1 px-2 text-right">CGST Amount</th>
-                        <th className="py-1 px-2 text-right">SGST Rate</th>
-                        <th className="py-1 px-2 text-right">SGST Amount</th>
-                      </>
+          {/* =========================================================================
+              4. PRODUCT DETAILS TABLE (Sr. No., Item Description, HSN/SAC, Qty, Unit, List Price, Discount, Tax %, Amount)
+          ========================================================================= */}
+          <table className="w-full text-left border-collapse table-fixed">
+            <thead>
+              <tr className="border-b border-black font-bold text-center text-[0.9em] bg-white">
+                <th className="py-1 px-1 border-r border-black w-10">Sr. No.</th>
+                <th className="py-1 px-1.5 border-r border-black text-left">Item Description</th>
+                <th className="py-1 px-1 border-r border-black w-16">HSN/SAC</th>
+                <th className="py-1 px-1 border-r border-black w-12">Qty</th>
+                <th className="py-1 px-1 border-r border-black w-12">Unit</th>
+                <th className="py-1 px-1 border-r border-black w-16 text-right">List Price</th>
+                <th className="py-1 px-1 border-r border-black w-16 text-right">Discount</th>
+                <th className="py-1 px-1 border-r border-black w-12 text-center">Tax %</th>
+                <th className="py-1 px-1.5 text-right w-20">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr
+                  key={it.index}
+                  className="border-b border-black/20 hover:bg-slate-50 text-[0.9em]"
+                >
+                  <td className="py-0.5 px-1 text-center font-mono border-r border-black">
+                    {it.index}
+                  </td>
+                  <td className="py-0.5 px-1.5 text-left font-medium border-r border-black break-words">
+                    <span className="font-bold text-black">{it.name}</span>
+                    {Boolean(it.sku || it.batch || it.expiry) && (
+                      <span className="block text-[0.85em] text-black/70">
+                        {it.sku && `[${it.sku}] `}
+                        {it.batch && `B:${it.batch} `}
+                        {it.expiry && `Exp:${it.expiry}`}
+                      </span>
                     )}
-                    <th className="py-1 px-2 text-right">Total Tax</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 font-mono">
-                  {gstSlabs.map((s, i) => (
-                    <tr key={i}>
-                      <td className="py-1 px-2 font-bold text-slate-800">{s.taxRate.toFixed(2)}%</td>
-                      <td className="py-1 px-2 text-right">{currency}{s.taxableAmount.toFixed(2)}</td>
-                      {isInterState ? (
-                        <>
-                          <td className="py-1 px-2 text-right">{s.taxRate.toFixed(2)}%</td>
-                          <td className="py-1 px-2 text-right">{currency}{s.igstAmount.toFixed(2)}</td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="py-1 px-2 text-right">{(s.taxRate / 2).toFixed(2)}%</td>
-                          <td className="py-1 px-2 text-right">{currency}{s.cgstAmount.toFixed(2)}</td>
-                          <td className="py-1 px-2 text-right">{(s.taxRate / 2).toFixed(2)}%</td>
-                          <td className="py-1 px-2 text-right">{currency}{s.sgstAmount.toFixed(2)}</td>
-                        </>
-                      )}
-                      <td className="py-1 px-2 text-right font-bold text-slate-900">{currency}{s.taxAmount.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </td>
+                  <td className="py-0.5 px-1 text-center font-mono text-black border-r border-black">
+                    {it.hsn || '—'}
+                  </td>
+                  <td className="py-0.5 px-1 text-center font-bold font-mono text-black border-r border-black">
+                    {it.quantity}
+                    {it.freeQuantity > 0 && (
+                      <span className="block text-[0.85em] font-semibold text-emerald-700">+{it.freeQuantity}</span>
+                    )}
+                  </td>
+                  <td className="py-0.5 px-1 text-center font-semibold text-black border-r border-black">
+                    {it.unit}
+                  </td>
+                  <td className="py-0.5 px-1 text-right font-mono text-black border-r border-black">
+                    {it.unitPrice.toFixed(2)}
+                  </td>
+                  <td className="py-0.5 px-1 text-right font-mono text-black border-r border-black">
+                    {it.discountAmount > 0 ? it.discountAmount.toFixed(2) : '0.00'}
+                  </td>
+                  <td className="py-0.5 px-1 text-center font-mono text-black border-r border-black">
+                    {it.taxRate}%
+                  </td>
+                  <td className="py-0.5 px-1.5 text-right font-mono font-bold text-black">
+                    {it.lineTotal.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-b border-black font-bold text-[0.9em] bg-white">
+                <td colSpan="3" className="py-1 px-1.5 text-right uppercase border-r border-black">
+                  Total:
+                </td>
+                <td className="py-1 px-1 text-center font-mono border-r border-black">
+                  {totalQuantitySum}
+                  {totalFreeQuantitySum > 0 && (
+                    <span className="block text-[0.85em] text-emerald-700">+{totalFreeQuantitySum}</span>
+                  )}
+                </td>
+                <td className="py-1 px-1 border-r border-black"></td>
+                <td className="py-1 px-1 text-right font-mono border-r border-black">
+                  {currency}{subtotalVal.toFixed(2)}
+                </td>
+                <td className="py-1 px-1 text-right font-mono border-r border-black">
+                  {discountVal > 0 ? `−${currency}${discountVal.toFixed(2)}` : '0.00'}
+                </td>
+                <td className="py-1 px-1 border-r border-black"></td>
+                <td className="py-1 px-1.5 text-right font-mono text-black">
+                  {currency}{grandTotalVal.toFixed(2)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
 
-          {/* Summary & Payment Tenders Section */}
-          <div className="flex items-start justify-between gap-6 pt-1">
-            {/* Left: Payment Tenders & Words */}
-            <div className="flex-1 space-y-2.5 text-[11px]">
-              {/* Payment Methods */}
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1">
-                <p className="font-bold text-slate-800 uppercase tracking-wider text-[10px]">
-                  Payment History / Breakdown:
-                </p>
+          {/* =========================================================================
+              5. BOTTOM SECTION: TAX BREAKDOWN, WORDS, PAYMENTS & TERMS (LEFT) | TOTALS (RIGHT)
+          ========================================================================= */}
+          <div className="grid grid-cols-12 border-b border-black">
+            {/* Left Column (7/12): Tax Breakdown + Words + Payment Details + Terms */}
+            <div className="col-span-7 border-r border-black flex flex-col justify-between text-[0.88em]">
+              {/* GST Tax Breakdown */}
+              {isGstInvoice && gstSlabs.length > 0 && (
+                <div className="border-b border-black">
+                  <div className="px-1.5 py-0.5 font-bold uppercase tracking-wider text-[0.9em] border-b border-black bg-white flex justify-between items-center">
+                    <span>GST Tax Breakdown</span>
+                    <span className="text-[0.85em] font-normal">Rate-wise CGST, SGST & IGST Distribution</span>
+                  </div>
+                  <table className="w-full text-left table-fixed border-collapse text-[0.9em]">
+                    <thead>
+                      <tr className="border-b border-black/40 font-bold bg-white">
+                        <th className="py-0.5 px-1 border-r border-black/40">Tax Slab</th>
+                        <th className="py-0.5 px-1 text-right border-r border-black/40">Taxable Val ({currency})</th>
+                        {isInterState ? (
+                          <>
+                            <th className="py-0.5 px-1 text-right border-r border-black/40">IGST %</th>
+                            <th className="py-0.5 px-1 text-right border-r border-black/40">IGST Amt ({currency})</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="py-0.5 px-1 text-right border-r border-black/40">CGST %</th>
+                            <th className="py-0.5 px-1 text-right border-r border-black/40">CGST Amt ({currency})</th>
+                            <th className="py-0.5 px-1 text-right border-r border-black/40">SGST %</th>
+                            <th className="py-0.5 px-1 text-right border-r border-black/40">SGST Amt ({currency})</th>
+                          </>
+                        )}
+                        <th className="py-0.5 px-1 text-right font-bold">Total Tax ({currency})</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/20 font-mono">
+                      {gstSlabs.map((s, i) => (
+                        <tr key={i}>
+                          <td className="py-0.5 px-1 font-bold border-r border-black/30">{s.taxRate.toFixed(2)}%</td>
+                          <td className="py-0.5 px-1 text-right border-r border-black/30">{s.taxableAmount.toFixed(2)}</td>
+                          {isInterState ? (
+                            <>
+                              <td className="py-0.5 px-1 text-right border-r border-black/30">{s.taxRate.toFixed(2)}%</td>
+                              <td className="py-0.5 px-1 text-right border-r border-black/30">{s.igstAmount.toFixed(2)}</td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-0.5 px-1 text-right border-r border-black/30">{(s.taxRate / 2).toFixed(2)}%</td>
+                              <td className="py-0.5 px-1 text-right border-r border-black/30">{s.cgstAmount.toFixed(2)}</td>
+                              <td className="py-0.5 px-1 text-right border-r border-black/30">{(s.taxRate / 2).toFixed(2)}%</td>
+                              <td className="py-0.5 px-1 text-right border-r border-black/30">{s.sgstAmount.toFixed(2)}</td>
+                            </>
+                          )}
+                          <td className="py-0.5 px-1 text-right font-bold">{s.taxAmount.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Amount in Words */}
+              <div className="p-1 border-b border-black text-[0.9em] leading-tight">
+                <span className="font-bold">Amount in Words: </span>
+                <span className="italic font-medium">{amountInWords}</span>
+              </div>
+
+              {/* Payment Details */}
+              <div className="p-1 border-b border-black text-[0.9em] leading-tight space-y-0.5">
+                <span className="font-bold uppercase tracking-wider block text-[0.85em]">
+                  Payment Details:
+                </span>
                 {paymentsList.map((pm, i) => {
                   const payDate = pm.payment_date || pm.created_at;
                   const dateStr = payDate ? new Date(payDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
                   return (
-                    <div key={i} className="flex justify-between font-mono text-slate-700 max-w-sm text-[10px]">
+                    <div key={i} className="flex justify-between font-mono text-[0.95em]">
                       <span>
-                        <strong className="text-slate-900">{pm.payment_method || pm.method || 'CASH'}</strong>
-                        {pm.reference_number ? ` (${pm.reference_number})` : ''}
-                        {pm.status === 'PENDING_CONFIRMATION' ? ' [Pending Confirmation]' : ''}
+                        <strong>{pm.payment_method || pm.method || 'CASH'}</strong>
+                        {pm.reference_number ? ` (Ref: ${pm.reference_number})` : ''}
+                        {pm.status === 'PENDING_CONFIRMATION' ? ' [Pending]' : ''}
                         {dateStr ? ` · ${dateStr}` : ''}:
                       </span>
-                      <span className="font-bold text-slate-900">{currency}{parseFloat(pm.amount || 0).toFixed(2)}</span>
+                      <strong className="font-bold">{currency}{parseFloat(pm.amount || 0).toFixed(2)}</strong>
                     </div>
                   );
                 })}
-                {balanceDueVal > 0 && (
-                  <div className="flex justify-between font-mono text-amber-800 font-bold max-w-sm pt-0.5 border-t border-slate-200">
-                    <span>Credit Balance Due:</span>
-                    <span>{currency}{balanceDueVal.toFixed(2)}</span>
+              </div>
+
+              {/* Terms and Conditions */}
+              <div className="p-1 text-[0.82em] leading-tight space-y-0.2">
+                <p className="font-bold uppercase tracking-wider text-[0.85em]">Terms and Conditions:</p>
+                <p>1. Goods once sold will not be accepted back or exchanged without original invoice.</p>
+                <p>2. Interest @ 18% p.a. will be charged on overdue payments beyond agreed credit period.</p>
+                <p>3. Any discrepancy or damage must be notified within 24 hours of receipt of goods.</p>
+                <p>4. All disputes are subject to local jurisdiction only.</p>
+              </div>
+            </div>
+
+            {/* Right Column (5/12): Financial Summary Totals & NET AMOUNT */}
+            <div className="col-span-5 p-1.5 space-y-0.5 font-mono text-[0.9em] flex flex-col justify-between">
+              <div className="space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="font-sans">Subtotal (Gross):</span>
+                  <strong>{currency}{subtotalVal.toFixed(2)}</strong>
+                </div>
+
+                {discountVal > 0 && (
+                  <div className="flex justify-between text-black">
+                    <span className="font-sans">Total Discount:</span>
+                    <span>−{currency}{discountVal.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {orderDiscVal > 0 && (
+                  <div className="flex justify-between">
+                    <span className="font-sans">Order Discount:</span>
+                    <span>−{currency}{orderDiscVal.toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between pt-0.5 border-t border-black/30">
+                  <span className="font-sans font-semibold">Taxable Amount:</span>
+                  <strong>{currency}{taxableTotalVal.toFixed(2)}</strong>
+                </div>
+
+                {isGstInvoice && (
+                  isInterState ? (
+                    <div className="flex justify-between">
+                      <span className="font-sans">Integrated GST (IGST):</span>
+                      <span>+{currency}{igstVal.toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="font-sans">Central GST (CGST):</span>
+                        <span>+{currency}{cgstVal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-sans">State GST (SGST):</span>
+                        <span>+{currency}{sgstVal.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )
+                )}
+
+                {roundOffVal !== 0 && (
+                  <div className="flex justify-between">
+                    <span className="font-sans">Round Off:</span>
+                    <span>{roundOffVal > 0 ? `+${currency}${roundOffVal.toFixed(2)}` : `−${currency}${Math.abs(roundOffVal).toFixed(2)}`}</span>
                   </div>
                 )}
               </div>
 
-              {/* Amount in Words */}
-              <div className="text-[10px] text-slate-600 bg-slate-50/50 p-2 rounded border border-slate-200">
-                <span className="font-bold text-slate-700">Amount in Words: </span>
-                <span className="italic font-medium">{amountInWords}</span>
-              </div>
-            </div>
-
-            {/* Right: Calculations Totals Box */}
-            <div className="w-72 space-y-1.5 font-mono text-xs">
-              <div className="flex justify-between text-slate-600">
-                <span>Subtotal (Gross):</span>
-                <span className="font-bold text-slate-900">{currency}{subtotalVal.toFixed(2)}</span>
-              </div>
-              {discountVal > 0 && (
-                <div className="flex justify-between text-emerald-600 font-semibold">
-                  <span>Total Discount:</span>
-                  <span>−{currency}{discountVal.toFixed(2)}</span>
+              {/* NET AMOUNT (Grand Total) - High prominence border box */}
+              <div className="pt-1 mt-1 border-t-2 border-b-2 border-black">
+                <div className="flex justify-between items-center py-1 font-extrabold text-[1.15em]">
+                  <span className="font-sans uppercase">NET AMOUNT:</span>
+                  <span className="font-mono">{currency}{grandTotalVal.toFixed(2)}</span>
                 </div>
-              )}
-              {orderDiscVal > 0 && (
-                <div className="flex justify-between text-emerald-600 text-[11px]">
-                  <span>Order Discount:</span>
-                  <span>−{currency}{orderDiscVal.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-slate-600 pt-0.5 border-t border-slate-200">
-                <span>Taxable Amount:</span>
-                <span className="font-semibold">{currency}{taxableTotalVal.toFixed(2)}</span>
-              </div>
-              {isGstInvoice && (
-                isInterState ? (
-                  <div className="flex justify-between text-slate-700">
-                    <span>Integrated GST (IGST):</span>
-                    <span>+{currency}{igstVal.toFixed(2)}</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between text-slate-700">
-                      <span>Central GST (CGST):</span>
-                      <span>+{currency}{cgstVal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-slate-700">
-                      <span>State GST (SGST):</span>
-                      <span>+{currency}{sgstVal.toFixed(2)}</span>
-                    </div>
-                  </>
-                )
-              )}
-              {roundOffVal !== 0 && (
-                <div className="flex justify-between text-slate-500 text-[11px]">
-                  <span>Round Off:</span>
-                  <span>{roundOffVal > 0 ? `+${currency}${roundOffVal.toFixed(2)}` : `−${currency}${Math.abs(roundOffVal).toFixed(2)}`}</span>
-                </div>
-              )}
-
-              {/* Grand Total Banner */}
-              <div className="flex justify-between text-sm font-black bg-[#0B1120] text-[#D4AF37] p-2 rounded-lg mt-1 border border-[#D4AF37]/40 shadow-xs">
-                <span>GRAND TOTAL:</span>
-                <span>{currency}{grandTotalVal.toFixed(2)}</span>
               </div>
 
-              <div className="flex justify-between text-[11px] pt-1 text-slate-600">
-                <span>Amount Paid:</span>
-                <span className="font-bold text-emerald-700">{currency}{paidVal.toFixed(2)}</span>
-              </div>
-              {balanceDueVal > 0 && (
-                <div className="flex justify-between text-[11px] text-amber-800 font-bold">
-                  <span>Balance Due:</span>
-                  <span>{currency}{balanceDueVal.toFixed(2)}</span>
+              <div className="space-y-0.2 pt-0.5">
+                <div className="flex justify-between">
+                  <span className="font-sans font-semibold">Paid Amount:</span>
+                  <strong>{currency}{paidVal.toFixed(2)}</strong>
                 </div>
-              )}
+                <div className="flex justify-between">
+                  <span className="font-sans font-semibold">Balance Due:</span>
+                  <strong className={balanceDueVal > 0 ? 'underline' : ''}>
+                    {currency}{balanceDueVal.toFixed(2)}
+                  </strong>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Declarations & Signatory Footer */}
-          <div className="pt-6 flex justify-between items-end border-t border-slate-300 text-xs text-slate-600">
-            <div className="max-w-md space-y-1">
-              <p className="text-[10px] font-semibold text-slate-700">Declaration:</p>
-              <p className="text-[9px] text-slate-500 leading-tight">
-                Certified that the particulars given above are true and correct and the amount indicated represents the price actually charged.
+          {/* =========================================================================
+              6. FOOTER & AUTHORIZED SIGNATURES
+          ========================================================================= */}
+          <div className="p-2 flex flex-row justify-between items-end text-[0.88em]">
+            <div className="space-y-4 max-w-sm">
+              <p className="leading-tight">
+                Customer Acknowledgment: Received the above mentioned goods in good condition & order.
               </p>
-              <p className="text-[9px] text-slate-500 leading-tight">
-                Terms: Goods once sold will not be returned without original invoice. Interest @ 18% p.a. will be charged on overdue payments.
-              </p>
+              <div>
+                <div className="w-36 border-b border-black mb-0.5" />
+                <p className="font-bold uppercase text-[0.95em]">Receiver's Signature & Seal</p>
+              </div>
             </div>
 
-            <div className="text-center shrink-0">
-              <p className="text-[10px] font-bold text-slate-700 uppercase mb-8">
+            <div className="text-right space-y-4">
+              <p className="font-bold uppercase">
                 For {businessName}
               </p>
-              <div className="w-44 border-b border-slate-700 mb-1 mx-auto" />
-              <p className="text-[10px] font-bold text-slate-800">Authorized Signatory</p>
+              <div>
+                <div className="w-40 border-b-2 border-black mb-0.5 ml-auto" />
+                <p className="font-bold uppercase text-[0.95em]">Authorized Signatory</p>
+                <p className="text-[0.8em] text-black/60 mt-0.2">Computer Generated Wholesale Invoice</p>
+              </div>
             </div>
           </div>
         </div>

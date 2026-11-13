@@ -144,7 +144,7 @@ export function ExpenseReportTab({ dateFrom, dateTo, currency = '₹' }) {
           <select
             value={categoryFilter}
             onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
-            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37] bg-white text-slate-700"
+            className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#E99FC1] focus:border-[#E99FC1] bg-white text-slate-700"
           >
             {EXPENSE_CATEGORIES.map((cat) => (
               <option key={cat.value} value={cat.value}>{cat.label}</option>

@@ -956,6 +956,502 @@ export const invoiceController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  /**
+   * PUT /api/invoices/:id — Edit / Update existing invoice
+   * Strictly authorized for ADMIN and MANAGER roles only.
+   */
+  update: async (req, res, next) => {
+    try {
+      const businessId = req.businessId;
+      const invoiceId = req.params.id;
+      const {
+        customer_id,
+        items,
+        order_discount = 0,
+        paid_amount,
+        notes
+      } = req.body;
+
+      // 1. Role verification: Only Admin and Manager are permitted to edit invoices
+      const userRole = (req.user?.role || '').toUpperCase();
+      if (userRole !== 'ADMIN' && userRole !== 'MANAGER') {
+        return apiResponse.error(
+          res,
+          'Unauthorized: Only Managers and Admins can edit invoices.',
+          403,
+          'FORBIDDEN'
+        );
+      }
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return apiResponse.error(res, 'At least one item is required in the invoice', 400, 'VALIDATION_ERROR');
+      }
+
+      const result = await sequelize.transaction(async (t) => {
+        // 2. Fetch existing invoice with its items
+        const invoice = await Sale.findOne({
+          where: { id: invoiceId, business_id: businessId },
+          include: [
+            { model: SaleItem, as: 'items' },
+            { model: Payment, as: 'payments' },
+            { model: Customer, as: 'customer' }
+          ],
+          lock: t.LOCK.UPDATE,
+          transaction: t
+        });
+
+        if (!invoice) {
+          throw Object.assign(new Error('Invoice not found in this business'), {
+            statusCode: 404,
+            code: 'NOT_FOUND'
+          });
+        }
+
+        if (invoice.status === 'CANCELLED') {
+          throw Object.assign(new Error('Cannot edit a cancelled invoice'), {
+            statusCode: 422,
+            code: 'INVOICE_CANCELLED'
+          });
+        }
+
+        if (invoice.status === 'REFUNDED') {
+          throw Object.assign(new Error('Cannot edit a fully refunded invoice'), {
+            statusCode: 422,
+            code: 'INVOICE_REFUNDED'
+          });
+        }
+
+        const oldGrandTotal = invoice.grand_total;
+        const oldBalanceDue = parseFloat(invoice.balance_due || 0);
+        const oldCustomerId = invoice.customer_id;
+
+        // 3. Revert stock of previous items back into inventory & batches
+        const oldItems = invoice.items || [];
+        for (const oldItem of oldItems) {
+          const oldFactor = parseFloat(oldItem.conversion_factor) || 1;
+          const oldCharged = parseInt(oldItem.quantity, 10) || 0;
+          const oldFree = parseInt(oldItem.free_quantity, 10) || 0;
+          const oldBaseQty = Math.round((oldCharged + oldFree) * oldFactor);
+
+          const oldProduct = await Product.findOne({
+            where: { id: oldItem.product_id, business_id: businessId },
+            lock: t.LOCK.UPDATE,
+            transaction: t
+          });
+
+          if (oldProduct && oldBaseQty > 0) {
+            await oldProduct.increment('quantity', { by: oldBaseQty, transaction: t });
+
+            if (oldItem.batch_number) {
+              const oldBatch = await Inventory.findOne({
+                where: {
+                  business_id: businessId,
+                  product_id: oldProduct.id,
+                  batch_number: oldItem.batch_number
+                },
+                lock: t.LOCK.UPDATE,
+                transaction: t
+              });
+              if (oldBatch) {
+                await oldBatch.increment('stock_quantity', { by: oldBaseQty, transaction: t });
+              }
+            }
+          }
+        }
+
+        // 4. Validate customer details
+        const business = await Business.findByPk(businessId, { transaction: t });
+        const businessState = (business?.state || '').trim().toLowerCase();
+
+        let newCustomer = null;
+        let isInterState = false;
+        const targetCustomerId = customer_id !== undefined ? customer_id : oldCustomerId;
+
+        if (targetCustomerId) {
+          newCustomer = await Customer.findOne({
+            where: { id: targetCustomerId, business_id: businessId },
+            lock: t.LOCK.UPDATE,
+            transaction: t
+          });
+          if (!newCustomer) {
+            throw Object.assign(new Error(`Customer ${targetCustomerId} not found`), {
+              statusCode: 404,
+              code: 'CUSTOMER_NOT_FOUND'
+            });
+          }
+          if (newCustomer.status === 'INACTIVE') {
+            throw Object.assign(new Error(`Customer "${newCustomer.name}" is inactive`), {
+              statusCode: 422,
+              code: 'CUSTOMER_INACTIVE'
+            });
+          }
+          if (newCustomer.state && businessState && newCustomer.state.trim().toLowerCase() !== businessState) {
+            isInterState = true;
+          }
+        }
+
+        // 5. Lock and retrieve new products
+        const productIds = items.map((i) => i.product_id);
+        const sortedProductIds = [...new Set(productIds)].sort((a, b) => a - b);
+
+        const products = await Product.findAll({
+          where: { id: { [Op.in]: sortedProductIds }, business_id: businessId },
+          include: [
+            { model: ProductUnit, as: 'units' },
+            { model: Inventory, as: 'batches' }
+          ],
+          lock: t.LOCK.UPDATE,
+          transaction: t
+        });
+
+        const productMap = {};
+        for (const p of products) {
+          productMap[p.id] = p;
+        }
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        let subtotal = new Decimal(0);
+        let itemDiscountTotal = new Decimal(0);
+        let taxTotal = new Decimal(0);
+        let cgstTotal = new Decimal(0);
+        let sgstTotal = new Decimal(0);
+        let igstTotal = new Decimal(0);
+
+        const newInvoiceItemsData = [];
+        const stockMovementsToCreate = [];
+
+        // 6. Process each updated line item
+        for (const item of items) {
+          const product = productMap[item.product_id];
+          if (!product) {
+            throw Object.assign(new Error(`Product ID ${item.product_id} not found`), {
+              statusCode: 404,
+              code: 'PRODUCT_NOT_FOUND'
+            });
+          }
+          if (!product.is_active || product.status === 'INACTIVE') {
+            throw Object.assign(new Error(`Product "${product.name}" is inactive`), {
+              statusCode: 422,
+              code: 'PRODUCT_INACTIVE'
+            });
+          }
+
+          const chargedQty = parseInt(item.quantity, 10);
+          if (isNaN(chargedQty) || chargedQty <= 0) {
+            throw Object.assign(new Error(`Quantity for "${product.name}" must be greater than zero`), {
+              statusCode: 400,
+              code: 'INVALID_QUANTITY'
+            });
+          }
+
+          const freeQty = Math.max(0, parseInt(item.free_quantity, 10) || 0);
+          const totalUnitsToDeduct = chargedQty + freeQty;
+
+          // Unit resolution
+          const requestedUnitName = (item.unit_name || product.base_unit || 'PCS').toUpperCase();
+          let unitObj = (product.units || []).find(
+            (u) => u.unit_name.toUpperCase() === requestedUnitName
+          );
+
+          let conversionFactor = 1;
+          let defaultRetailPrice = parseFloat(product.selling_price) || 0;
+          let defaultWholesalePrice = parseFloat(product.wholesale_price) || (defaultRetailPrice * 0.85);
+
+          if (unitObj) {
+            conversionFactor = parseFloat(unitObj.conversion_factor) || 1;
+            defaultRetailPrice = parseFloat(unitObj.retail_price) || defaultRetailPrice;
+            defaultWholesalePrice = parseFloat(unitObj.wholesale_price) || defaultWholesalePrice;
+          } else {
+            const pack = product.carton_pack_qty || 12;
+            if (requestedUnitName === 'BOX') {
+              conversionFactor = pack;
+              defaultRetailPrice = defaultRetailPrice * pack;
+              defaultWholesalePrice = defaultWholesalePrice * pack;
+            } else if (requestedUnitName === 'CTN') {
+              conversionFactor = pack * 10;
+              defaultRetailPrice = defaultRetailPrice * pack * 10;
+              defaultWholesalePrice = defaultWholesalePrice * pack * 9.5;
+            }
+          }
+
+          const totalBaseQty = Math.round(totalUnitsToDeduct * conversionFactor);
+
+          // Unit Price determination
+          let finalUnitPrice;
+          if (item.unit_price !== undefined && item.unit_price !== null && !isNaN(parseFloat(item.unit_price))) {
+            finalUnitPrice = new Decimal(item.unit_price);
+          } else if (
+            newCustomer &&
+            ['WHOLESALE', 'BULK', 'SUB_WHOLESALER'].includes(newCustomer.customer_type)
+          ) {
+            finalUnitPrice = new Decimal(defaultWholesalePrice);
+          } else {
+            finalUnitPrice = new Decimal(defaultRetailPrice);
+          }
+
+          // Line calculations
+          const lineGross = new Decimal(chargedQty).mul(finalUnitPrice);
+          const discPct = new Decimal(item.discount_percent || 0);
+          let lineDiscount = lineGross.mul(discPct).div(100);
+          if (item.discount_amount && parseFloat(item.discount_amount) > 0) {
+            lineDiscount = new Decimal(item.discount_amount);
+          }
+          lineDiscount = lineDiscount.toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+          const lineTaxable = Decimal.max(0, lineGross.minus(lineDiscount));
+          const taxRate = new Decimal(item.tax_rate !== undefined ? item.tax_rate : (product.tax_rate || 0));
+          const lineTax = lineTaxable.mul(taxRate).div(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+          const lineTotal = lineTaxable.plus(lineTax).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+
+          let lineCgst = new Decimal(0);
+          let lineSgst = new Decimal(0);
+          let lineIgst = new Decimal(0);
+
+          if (isInterState) {
+            lineIgst = lineTax;
+          } else {
+            lineCgst = lineTax.div(2).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+            lineSgst = lineTax.minus(lineCgst);
+          }
+
+          subtotal = subtotal.plus(lineGross);
+          itemDiscountTotal = itemDiscountTotal.plus(lineDiscount);
+          taxTotal = taxTotal.plus(lineTax);
+          cgstTotal = cgstTotal.plus(lineCgst);
+          sgstTotal = sgstTotal.plus(lineSgst);
+          igstTotal = igstTotal.plus(lineIgst);
+
+          // Batch resolution and stock verification
+          let selectedBatchNumber = item.batch_number ? String(item.batch_number).trim() : null;
+          if (selectedBatchNumber) {
+            const batchRecord = await Inventory.findOne({
+              where: {
+                business_id: businessId,
+                product_id: product.id,
+                batch_number: selectedBatchNumber
+              },
+              lock: t.LOCK.UPDATE,
+              transaction: t
+            });
+
+            if (batchRecord) {
+              if (batchRecord.expiry_date && batchRecord.expiry_date < todayStr) {
+                throw Object.assign(
+                  new Error(`Batch "${selectedBatchNumber}" for "${product.name}" expired on ${batchRecord.expiry_date}`),
+                  { statusCode: 422, code: 'BATCH_EXPIRED' }
+                );
+              }
+              if (batchRecord.stock_quantity < totalBaseQty) {
+                throw Object.assign(
+                  new Error(`Insufficient stock in batch "${selectedBatchNumber}" for "${product.name}". Required: ${totalBaseQty}, Available: ${batchRecord.stock_quantity}`),
+                  { statusCode: 422, code: 'INSUFFICIENT_BATCH_STOCK' }
+                );
+              }
+              await batchRecord.decrement('stock_quantity', { by: totalBaseQty, transaction: t });
+            }
+          } else {
+            // FIFO deduction
+            const availableBatches = await Inventory.findAll({
+              where: {
+                business_id: businessId,
+                product_id: product.id,
+                stock_quantity: { [Op.gt]: 0 }
+              },
+              order: [['expiry_date', 'ASC'], ['created_at', 'ASC']],
+              lock: t.LOCK.UPDATE,
+              transaction: t
+            });
+
+            let remainingToDeduct = totalBaseQty;
+            for (const b of availableBatches) {
+              if (remainingToDeduct <= 0) break;
+              if (b.expiry_date && b.expiry_date < todayStr) continue;
+
+              const deductFromThis = Math.min(b.stock_quantity, remainingToDeduct);
+              await b.decrement('stock_quantity', { by: deductFromThis, transaction: t });
+              remainingToDeduct -= deductFromThis;
+
+              if (!selectedBatchNumber) {
+                selectedBatchNumber = b.batch_number;
+              }
+            }
+          }
+
+          // Total stock check (PREVENTS NEGATIVE STOCK)
+          if (product.quantity < totalBaseQty) {
+            throw Object.assign(
+              new Error(`Insufficient stock for "${product.name}". Available: ${product.quantity} base PCS, Required: ${totalBaseQty} base PCS.`),
+              { statusCode: 422, code: 'INSUFFICIENT_STOCK' }
+            );
+          }
+
+          const prevProductQty = product.quantity;
+          const newProductQty = prevProductQty - totalBaseQty;
+          await product.update({ quantity: newProductQty }, { transaction: t });
+
+          // Stock movement
+          stockMovementsToCreate.push({
+            business_id: businessId,
+            product_id: product.id,
+            user_id: req.user.id,
+            type: 'SALE',
+            quantity_change: -totalBaseQty,
+            previous_quantity: prevProductQty,
+            new_quantity: newProductQty,
+            batch_number: selectedBatchNumber || product.batch_number || null,
+            notes: `Invoice Edit (${invoice.invoice_number}): ${chargedQty} ${requestedUnitName}`
+          });
+
+          newInvoiceItemsData.push({
+            business_id: businessId,
+            sale_id: invoice.id,
+            product_id: product.id,
+            product_name: product.name,
+            product_sku: product.sku,
+            unit_cost_price: product.cost_price || 0.00,
+            unit_selling_price: finalUnitPrice.toFixed(2),
+            quantity: chargedQty,
+            free_quantity: freeQty,
+            unit_name: requestedUnitName,
+            conversion_factor: conversionFactor,
+            total_base_quantity: totalBaseQty,
+            batch_number: selectedBatchNumber || product.batch_number || null,
+            discount_percentage: discPct.toFixed(2),
+            discount_amount: lineDiscount.toFixed(2),
+            taxable_amount: lineTaxable.toFixed(2),
+            tax_rate: taxRate.toFixed(2),
+            cgst_amount: lineCgst.toFixed(2),
+            sgst_amount: lineSgst.toFixed(2),
+            igst_amount: lineIgst.toFixed(2),
+            tax_amount: lineTax.toFixed(2),
+            line_total: lineTotal.toFixed(2),
+            total_price: lineTotal.toFixed(2)
+          });
+        }
+
+        // 7. Order discount & grand total recalculation
+        const orderDisc = new Decimal(order_discount !== undefined ? order_discount : (invoice.order_discount || 0));
+        const totalDiscount = itemDiscountTotal.plus(orderDisc);
+
+        const rawGrandTotal = subtotal.minus(totalDiscount).plus(taxTotal);
+        const roundedTotal = rawGrandTotal.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+        const roundOff = roundedTotal.minus(rawGrandTotal).toDecimalPlaces(2);
+        const grandTotal = Decimal.max(0, roundedTotal);
+
+        // 8. Paid amount and balance due resolution
+        let effectivePaid = new Decimal(invoice.paid_amount || 0);
+        if (paid_amount !== undefined && paid_amount !== null && !isNaN(parseFloat(paid_amount))) {
+          effectivePaid = Decimal.min(new Decimal(paid_amount), grandTotal);
+        } else if (invoice.payment_status === 'PAID') {
+          effectivePaid = grandTotal;
+        } else {
+          effectivePaid = Decimal.min(effectivePaid, grandTotal);
+        }
+
+        const newBalanceDue = Decimal.max(0, grandTotal.minus(effectivePaid));
+        let newPaymentStatus = 'UNPAID';
+        if (effectivePaid.gte(grandTotal) && grandTotal.gt(0)) {
+          newPaymentStatus = 'PAID';
+        } else if (effectivePaid.gt(0)) {
+          newPaymentStatus = 'PARTIALLY_PAID';
+        }
+
+        // 9. Customer Outstanding Balance adjustment
+        if (oldCustomerId && oldBalanceDue > 0) {
+          const oldCust = await Customer.findByPk(oldCustomerId, { lock: t.LOCK.UPDATE, transaction: t });
+          if (oldCust) {
+            const currentBal = parseFloat(oldCust.outstanding_balance || 0);
+            const deductAmt = Math.min(currentBal, oldBalanceDue);
+            if (deductAmt > 0) {
+              await oldCust.decrement('outstanding_balance', { by: deductAmt, transaction: t });
+            }
+          }
+        }
+
+        if (newCustomer && newBalanceDue.gt(0)) {
+          const currentOutstanding = parseFloat(newCustomer.outstanding_balance || 0);
+          const creditLimit = parseFloat(newCustomer.credit_limit || 0);
+          const additionalCredit = newBalanceDue.toNumber();
+          const nextOutstanding = currentOutstanding + additionalCredit;
+
+          if (creditLimit > 0 && nextOutstanding > creditLimit) {
+            throw Object.assign(
+              new Error(`Credit limit exceeded for "${newCustomer.name}". Credit Limit: ${creditLimit}, Projected Outstanding: ${nextOutstanding.toFixed(2)}`),
+              { statusCode: 400, code: 'CREDIT_LIMIT_EXCEEDED' }
+            );
+          }
+
+          await newCustomer.increment('outstanding_balance', { by: additionalCredit, transaction: t });
+        }
+
+        // 10. Replace SaleItems
+        await SaleItem.destroy({ where: { sale_id: invoice.id }, transaction: t });
+        await SaleItem.bulkCreate(newInvoiceItemsData, { transaction: t });
+
+        // 11. Create StockMovement records
+        for (const sm of stockMovementsToCreate) {
+          sm.reference_id = invoice.invoice_number;
+          await StockMovement.create(sm, { transaction: t });
+        }
+
+        // 12. Update Sale record while preserving the original invoice_number!
+        await invoice.update({
+          customer_id: newCustomer ? newCustomer.id : null,
+          subtotal: subtotal.toFixed(2),
+          total_amount: subtotal.toFixed(2),
+          discount_total: totalDiscount.toFixed(2),
+          discount_amount: totalDiscount.toFixed(2),
+          order_discount: orderDisc.toFixed(2),
+          tax_total: taxTotal.toFixed(2),
+          tax_amount: taxTotal.toFixed(2),
+          cgst_total: cgstTotal.toFixed(2),
+          sgst_total: sgstTotal.toFixed(2),
+          igst_total: igstTotal.toFixed(2),
+          round_off: roundOff.toFixed(2),
+          grand_total: grandTotal.toFixed(2),
+          net_amount: grandTotal.toFixed(2),
+          paid_amount: effectivePaid.toFixed(2),
+          balance_due: newBalanceDue.toFixed(2),
+          payment_status: newPaymentStatus,
+          notes: notes !== undefined ? notes : invoice.notes
+        }, { transaction: t });
+
+        // 13. Write AuditLog
+        await AuditLog.create({
+          business_id: businessId,
+          user_id: req.user.id,
+          action: 'INVOICE_EDIT',
+          entity: 'Invoice',
+          entity_id: String(invoice.id),
+          changes: {
+            invoice_number: invoice.invoice_number,
+            old_grand_total: oldGrandTotal,
+            new_grand_total: grandTotal.toFixed(2),
+            old_items_count: oldItems.length,
+            new_items_count: items.length
+          },
+          ip_address: req.ip || null
+        }, { transaction: t });
+
+        return { invoice_id: invoice.id };
+      });
+
+      // 14. Return the fully populated updated invoice
+      const updatedInvoice = await Sale.findByPk(result.invoice_id, {
+        include: [
+          { model: Customer, as: 'customer' },
+          { model: User, as: 'cashier', attributes: ['id', 'name', 'role'] },
+          { model: SaleItem, as: 'items' },
+          { model: Payment, as: 'payments' }
+        ]
+      });
+
+      return apiResponse.success(res, { invoice: updatedInvoice, sale: updatedInvoice }, 'Invoice updated successfully');
+    } catch (error) {
+      next(error);
+    }
   }
 };
 

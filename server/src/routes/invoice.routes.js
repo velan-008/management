@@ -10,6 +10,7 @@ router.use(authenticate);
 router.get('/', invoiceController.list);
 router.post('/sync-batch', authorizeRoles('ADMIN', 'STAFF'), invoiceController.syncBatch);
 router.get('/:id', invoiceController.getById);
+router.put('/:id', authorizeRoles('ADMIN', 'MANAGER'), invoiceController.update);
 router.post('/', authorizeRoles('ADMIN', 'STAFF'), invoiceController.create);
 
 export default router;
